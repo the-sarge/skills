@@ -1,0 +1,4 @@
+interface:
+  display_name: "DEVONthink CLI"
+  short_description: "Read, capture, organize, and safely mutate DEVONthink via the local CLI."
+  default_prompt: "Use the local devonthink CLI to help with this DEVONthink task. Prefer JSON output, discover UUIDs before writes, and respect confirmation and partial-update recovery rules."
