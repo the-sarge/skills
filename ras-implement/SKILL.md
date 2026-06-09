@@ -21,14 +21,14 @@ Use `ras implement` when the user wants RAS to orchestrate implementation throug
 
 Local mode leaves the final code on the implementation branch/worktree printed by the command. It is not automatically merged into the original checkout and it does not post to GitHub by default.
 
-PR-backed mode (`--open-pr` or project config `implement.default_mode: pr`) pushes the implementation branch, opens a draft PR, then uses the same review/fix/verify/fresh-review discipline as `ras review-loop`. It finishes only after a clean fresh review or a terminal blocked status.
+PR-backed mode (the default, or explicit `--open-pr`) pushes the implementation branch, opens a draft PR, then uses the same review/fix/verify/fresh-review discipline as `ras review-fix` / `ras review-loop`. It finishes only after a clean fresh review or a terminal blocked status.
 
 ## Before Running
 
 1. Confirm the current directory is the intended git repository.
 2. Inspect `git status --short`; avoid starting a loop from an unintended dirty base. If changes are present, account for them explicitly. PR-backed mode requires a clean original checkout.
 3. Check that `ras` is available with `command -v ras`. If working inside the `ras` source repo and a fresh local binary is needed, build or run the local CLI intentionally.
-4. Check the builder config if behavior matters: `.ras.yaml`, `.ras/config.yaml`, then `~/.config/ras/config.yaml`.
+4. Check the builder config if behavior matters: `.ras/config.yaml`, then `~/.config/ras/config.yaml`.
 5. Ensure the requested work item is precise enough for an autonomous builder. If it is vague or high risk, convert it into a short PRD with goals, constraints, acceptance criteria, and verification steps before invoking the loop.
 
 ## Choose The Work Item Source
@@ -70,21 +70,21 @@ Supported context refs are `file:`, `url:`, and `run:`. Keep context relevant; d
 
 ## Choose The Execution Mode
 
-Default to local mode unless the user asks for a PR, the project config defaults to PR mode, or the work needs GitHub review/verify gates before handoff.
+Default to PR-backed mode unless the user asks for local-only behavior or the effective config sets `implement.default_mode: local`.
 
 Local mode:
 
 ```bash
-ras implement docs/feature.md --max-iters 3
+ras implement docs/feature.md --local-only --max-iters 3
 ```
 
 PR-backed mode:
 
 ```bash
-ras implement docs/feature.md --open-pr --max-review-loops 3 --max-fix-loops 3
+ras implement docs/feature.md --max-review-loops 3 --max-fix-loops 3
 ```
 
-Use `--local-only` when project config defaults to PR mode but the user wants a local implementation worktree. Use `--pr-base` and `--pr-remote` only when the default target is wrong.
+Use `--local-only` when the user wants a local implementation worktree. Use `--pr-base` and `--pr-remote` only when the default target is wrong.
 
 PR-backed constraints:
 
@@ -101,10 +101,10 @@ Start with conservative limits until the project has proven behavior:
 ras implement docs/feature.md --max-iters 3
 ```
 
-Use `--no-review` only for throwaway experiments or when reviewer agents are intentionally unavailable:
+Use local mode and `--no-review` only for throwaway experiments or when reviewer agents are intentionally unavailable:
 
 ```bash
-ras implement --task "Rename the internal helper" --no-review --max-iters 1
+ras implement --task "Rename the internal helper" --local-only --no-review --max-iters 1
 ```
 
 Use `--squash` in local mode when the user wants a single final implementation commit if the loop finishes with `done`; use `--no-squash` when iteration history is useful.

@@ -35,7 +35,7 @@ It does not post to GitHub unless `--post` is passed or the user later runs `ras
    command -v ras
    ```
 
-5. Check `.ras.yaml`, `.ras/config.yaml`, then `~/.config/ras/config.yaml` if agents, prompts, context shape, delivery mode, or model profile matter.
+5. Check `.ras/config.yaml`, then `~/.config/ras/config.yaml` if agents, prompts, context shape, delivery mode, or model profile matter.
 
 ## Run Pattern
 
@@ -80,6 +80,10 @@ Use `--no-adjudication` only when the user explicitly wants faster, less process
 
 Wait for the command to finish and read the final synthesis. Do not treat a quiet run or an exit code alone as a clean review.
 
+Separate agents may run other plain `ras review` commands against different PRs in the same repository while this review is running. RAS gives each review its own run id, run directory, and disposable worktrees, though very large parallel batches can still contend on shared SQLite and Git worktree locks.
+
+For this run, prefer the command's own output as the live progress source. Use `ras status`, `ras show`, `ras report`, or `ras serve` for explicit diagnostics or after the run completes rather than as a noisy polling loop.
+
 When reporting back, include:
 
 - run id
@@ -98,3 +102,4 @@ If the user asks to fix findings after a review, do not silently start a complet
 - Do not hide failed reviewer, adjudication, or synthesis output.
 - Do not claim the PR is merge-ready just because `ras review` completed; the synthesis content determines that.
 - Treat low-severity and nit findings separately from true blockers when summarizing.
+- Do not run cleanup/admin mutations such as `ras cleanup stale-runs --apply` while active reviews may still own the listed state.

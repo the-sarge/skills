@@ -1,12 +1,7 @@
 ---
 name: ras-review-loop
 description: >-
-  Use only when the user explicitly asks for a complete RAS review loop, such as
-  "run the RAS review loop", "review-fix-verify-review", "iterate until the PR
-  has no findings", or "keep reviewing and fixing until clean". Prefer the
-  first-class `ras review-loop` command for supported same-repository PRs. Do
-  not use for single-step requests to only run `ras review`, fix known findings,
-  run `ras verify`, or run a fresh review.
+  Use only when the user explicitly asks for a complete RAS review loop, such as "run the RAS review loop", "review-fix-verify-review", "iterate until the PR has no findings", or "keep reviewing and fixing until clean". Prefer the first-class `ras review-fix` command for supported same-repository PRs; `ras review-loop` remains supported for compatibility. Do not use for single-step requests to only run `ras review`, fix known findings, run `ras verify`, or run a fresh review.
 ---
 
 # RAS Review Loop
@@ -17,7 +12,7 @@ Do not use it for one-shot commands. A request to run `ras review`, fix a known 
 
 ## Operating Model
 
-For same-repository PRs, `ras review-loop` is the primary path. It creates a RAS-owned worktree, runs the builder against review/verification feedback, pushes normal commits to the PR branch, and repeats until a clean fresh review or a terminal blocked status.
+For same-repository PRs, `ras review-fix` is the primary path. It creates a RAS-owned worktree, runs the builder against review/verification feedback, pushes normal commits to the PR branch, and repeats until a clean fresh review or a terminal blocked status. `ras review-loop` is the older compatible command name.
 
 ```text
 outer review loop:
@@ -58,23 +53,25 @@ This skill does not merge the PR, update task trackers, append the development j
 Run:
 
 ```bash
-ras review-loop <pr-url-or-number>
+ras review-fix <pr-url-or-number>
 ```
 
 Useful caps and routing flags:
 
 ```bash
-ras review-loop <pr> --max-review-loops 3 --max-fix-loops 3
-ras review-loop <pr> --context file:docs/plan.md --context run:<run-id>
-ras review-loop <pr> --builder-model-profile <name> --review-model-profile <name>
-ras review-loop <pr> --pr-remote origin
+ras review-fix <pr> --max-review-loops 3 --max-fix-loops 3
+ras review-fix <pr> --context file:docs/plan.md --context run:<run-id>
+ras review-fix <pr> --builder-model-profile <name> --review-model-profile <name>
+ras review-fix <pr> --pr-remote origin
 ```
 
 Default to the project config for loop limits and model profiles unless the user asks for specific overrides. If setting `--max-iters`, keep it high enough to cover the requested review/fix loop caps; the CLI warns when it is probably too low.
 
 ## Command Results
 
-`ras review-loop` can be long-running and quiet. Wait for completion, then read the final handoff. Do not infer success from silence or from an exit code alone; the final status and synthesis content determine whether the loop is complete.
+`ras review-fix` can be long-running and quiet. Wait for completion, then read the final handoff. Do not infer success from silence or from an exit code alone; the final status and synthesis content determine whether the loop is complete.
+
+While a review-fix/review-loop command is running, monitor that command's own output as the primary progress source. `ras status`, `ras show`, `ras report`, and `ras serve` are appropriate for explicit diagnostics or after the loop exits, but do not turn them into a polling loop.
 
 When reporting back, include:
 
@@ -88,9 +85,11 @@ When reporting back, include:
 
 On `done`, RAS removes the review-loop worktree. On non-`done` terminal statuses after setup, RAS retains the worktree for forensics; do not delete it unless the user asks.
 
+Other agents may run separate plain `ras review` commands against different PRs while this loop runs, but do not run another fixer, implementation loop, manual branch-editing loop, or cleanup mutation against the same PR branch at the same time.
+
 ## Manual Fallback
 
-Use the manual loop only when `ras review-loop` is unavailable, the PR is unsupported by the first-class command, or the user explicitly asks the current agent to edit the PR directly.
+Use the manual loop only when `ras review-fix` or `ras review-loop` is unavailable, the PR is unsupported by the first-class command, or the user explicitly asks the current agent to edit the PR directly.
 
 Before manual edits, ensure the local checkout is on the PR head branch and matches the PR head SHA, or deliberately switch/fetch before editing. If the PR head moved unexpectedly, stop.
 
