@@ -1,14 +1,7 @@
 ---
 name: ras-implement
 description: >-
-  Use when Codex needs to run or guide `ras implement` to drive a work item,
-  PRD, prior ras run synthesis, or inline task through RAS's isolated
-  builder/review loop, including local implementation mode or PR-backed
-  implementation mode. Use for requests such as "use ras implement", "run the
-  implement loop", "implement this PRD with RAS", "open a RAS implementation
-  PR", or "turn this RAS run into code". Do not use when acting as the
-  builder/reviewer subprocess inside an already-running `ras implement`; in that
-  case follow the prompt and manifest contract instead of starting another loop.
+  Use when Codex needs to run or guide `ras implement` to drive an approach-ready work item, PRD, prior ras run synthesis, or inline task through RAS's isolated builder/review loop, including local implementation mode or PR-backed implementation mode. Use for requests such as "use ras implement", "run the implement loop", "implement this PRD with RAS", "open a RAS implementation PR", or "turn this RAS run into code". Use read-only consideration or review first when the implementation strategy is still uncertain. Do not use when acting as the builder/reviewer subprocess inside an already-running `ras implement`; in that case follow the prompt and manifest contract instead of starting another loop.
 ---
 
 # RAS Implement
@@ -22,6 +15,12 @@ Use `ras implement` when the user wants RAS to orchestrate implementation throug
 Local mode leaves the final code on the implementation branch/worktree printed by the command. It is not automatically merged into the original checkout and it does not post to GitHub by default.
 
 PR-backed mode (the default, or explicit `--open-pr`) pushes the implementation branch, opens a draft PR, then uses the same review/fix/verify/fresh-review discipline as `ras review-fix` / `ras review-loop`. It finishes only after a clean fresh review or a terminal blocked status.
+
+## Approach Risk Gate
+
+If implementation hinges on an uncertain strategy, do not hand it straight to an autonomous builder loop. First use `ras consider` on a PRD, design, or plan, or tighten the work item until it names the chosen approach, non-goals, constraints, and verification. For an existing PR whose approach may be wrong, use one-shot `ras review` before PR-backed implement/review-fix behavior takes over.
+
+PR-backed `ras implement` can compound a bad foundation because it creates and then auto-repairs a PR through review/fix/verify gates. Use it when the work item specifies a sound direction and expected findings are local patches. If a run blocks on the same foundational review finding, stop and revise the work item or approach; do not retry the same autonomous loop.
 
 ## Before Running
 
@@ -63,7 +62,7 @@ Implement the feature, including constraints, acceptance criteria, and checks.
 Add extra context with repeatable flags:
 
 ```bash
-ras implement docs/feature.md --context file:README.md --context run:<run-id>
+ras implement docs/prd/feature.md --context file:README.md --context run:<run-id>
 ```
 
 Supported context refs are `file:`, `url:`, and `run:`. Keep context relevant; do not attach the whole repository as prose.
@@ -75,13 +74,13 @@ Default to PR-backed mode unless the user asks for local-only behavior or the ef
 Local mode:
 
 ```bash
-ras implement docs/feature.md --local-only --max-iters 3
+ras implement docs/prd/feature.md --local-only --max-iters 3
 ```
 
 PR-backed mode:
 
 ```bash
-ras implement docs/feature.md --max-review-loops 3 --max-fix-loops 3
+ras implement docs/prd/feature.md --max-review-loops 3 --max-fix-loops 3
 ```
 
 Use `--local-only` when the user wants a local implementation worktree. Use `--pr-base` and `--pr-remote` only when the default target is wrong.
@@ -98,7 +97,7 @@ PR-backed constraints:
 Start with conservative limits until the project has proven behavior:
 
 ```bash
-ras implement docs/feature.md --max-iters 3
+ras implement docs/prd/feature.md --max-iters 3
 ```
 
 Use local mode and `--no-review` only for throwaway experiments or when reviewer agents are intentionally unavailable:
@@ -123,7 +122,7 @@ Watch the progress output for:
 - review run id
 - final status
 
-If the loop fails with `blocked`, `stuck`, or `max_iters`, inspect the implementation record, builder raw output, and review synthesis before retrying with clearer instructions or narrower scope.
+If the loop fails with `blocked`, `stuck`, or `max_iters`, inspect the implementation record, builder raw output, and review synthesis before retrying with clearer instructions or narrower scope. For agent-readable inspection of associated review runs, use `ras status <run-id> --json` or `ras show <run-id> --json` to read structured run status, agent rounds, artifacts, verifications, and any available synthesis.
 
 For PR-backed mode, also watch for:
 
@@ -145,7 +144,7 @@ For PR-backed mode, also watch for:
    ```
 
 3. Run the project's verification commands in the implementation worktree, not the original checkout.
-4. Use `ras serve` or `ras report` when the user needs stored history, review findings, or artifacts.
+4. Use `ras status <run-id> --json` or `ras show <run-id> --json` for structured agent-readable inspection, and use `ras serve` or `ras report` when the user needs browsable stored history, review findings, or artifacts.
 5. Tell the user where the result lives and whether it needs merge, cherry-pick, push, PR review, or follow-up fixes.
 
 For PR-backed mode, report the PR URL, final status, final head, and any retained worktree or cleanup guidance printed by RAS. Do not merge or mark the PR ready unless the user separately asks.

@@ -1,11 +1,7 @@
 ---
 name: ras-consider
 description: >-
-  Use when Codex needs to run or guide `ras consider` on a local PRD, design
-  doc, implementation plan, spec, or other repository file to get a multi-agent
-  critique without a GitHub PR. Use for requests such as "consider this PRD",
-  "run RAS consider", "review this design doc with RAS", or "get multi-agent
-  feedback on this plan". Do not use for GitHub PR review; use `ras-review`.
+  Use when Codex needs to run or guide `ras consider` on a local PRD, design doc, implementation plan, spec, or other repository file to get a multi-agent critique without a GitHub PR. Prefer it as a read-only design gate before mutating loops when approach viability is still open. Use for requests such as "consider this PRD", "run RAS consider", "review this design doc with RAS", or "get multi-agent feedback on this plan". Do not use for GitHub PR review; use `ras-review`.
 ---
 
 # RAS Consider
@@ -17,6 +13,10 @@ Use `ras consider` when the user wants a multi-agent critique of a local reposit
 `ras consider <file>` runs the same review/adjudication/synthesis pipeline as `ras review`, but the target is a local file inside the current git repository. It stores a normal RAS run that can be shown, reported, and browsed locally.
 
 Consideration runs are local-only and do not post to GitHub. `ras verify <consider-run-id>` is supported for source-aware follow-up: it verifies the current local document in a matching checkout against the prior consideration synthesis, records document fingerprints, and refuses legacy runs without source metadata with `source_identity_unavailable`; `--head` remains PR-only. Missing or failing consideration verifier agents fail closed with `blocked/verify_failed` instead of silently treating the result as clean. If the verifier returns output that fails strict parsing or validation against the required JSON result, RAS runs one strict reformatting repair prompt against the same verifier agent and the same fingerprint scope. Repair is strict structured-output recovery, not semantic prose interpretation: the original raw verifier output must contain structured or JSON-like evidence before a repaired parsed result can be accepted. JSON-like raw output is grounded by item status and prior finding identity, so a raw `resolved` entry can ground only repaired `resolved`, a raw `unresolved` entry can ground only that entry's `status`, conflicting structured raw statuses for the same prior finding identity cannot ground any repaired prior status, and packet-ready out-of-scope `new_scope` and `needs_human` entries can ground only matching repaired entries. Prose-only raw output, including status sentences, Markdown headings, schema-field references, and mixed or negated status prose, fails closed with `blocked/verify_parse_failed`. On successful repair, the verification row keeps the original raw verifier output as the primary artifact, returns that same raw body to the caller, and stores the repaired parsed JSON separately for metadata. A repair pass may add one extra verifier-agent invocation with the same timeout/cost profile as verification. If repair also fails, returns empty stdout, introduces judgments without matching structured raw evidence, or if the repair prompt would exceed the verification prompt size limit, RAS persists the original raw verification artifact without parsed metadata and fails closed with `blocked/verify_parse_failed`; repair prompt and parsed-result artifact or database persistence failures are returned directly and do not write synthetic parse-failure verification rows.
+
+## Approach Gate
+
+Use `ras consider` as the cheap design gate before a mutating loop when the artifact describes a possible approach rather than an accepted plan. If the synthesis says the foundation is wrong, ambiguous, or depends on an unresolved product/architecture choice, keep the decision with the user and revise the document; do not immediately feed it to `ras implement --from-run` or `ras-consider-resolve`.
 
 ## Before Running
 
@@ -36,7 +36,7 @@ Consideration runs are local-only and do not post to GitHub. `ras verify <consid
 Use `--kind` to name the artifact in prompts and stored output:
 
 ```bash
-ras consider docs/feature-prd.md --kind prd
+ras consider docs/prd/feature-prd.md --kind prd
 ras consider docs/design.md --kind design
 ras consider docs/implementation-plan.md --kind plan
 ```
@@ -48,7 +48,7 @@ If no specific type is clear, omit `--kind` and let it default to `doc`.
 Attach focused local context with repeatable `file:` refs:
 
 ```bash
-ras consider docs/feature-prd.md --kind prd --context file:README.md --context file:SPEC.md
+ras consider docs/prd/feature-prd.md --kind prd --context file:README.md --context file:SPEC.md
 ```
 
 Only `file:` context refs are supported. Keep context narrow; do not paste or attach the whole repository as prose.
@@ -90,15 +90,15 @@ When reporting back, include:
 - considered file and kind
 - key findings or recommendations
 - whether any agent, adjudication, or synthesis stage failed
-- where to inspect the run, such as `ras status <run-id>`, `ras show <run-id>`, `ras report <run-id>`, or `ras serve`
+- where to inspect the run, such as `ras status <run-id> --json` or `ras show <run-id> --json` for agent-readable detail, and `ras report <run-id>` or `ras serve` for human browsing
 
-If the user asks to resolve findings in the document itself, use `ras-consider-resolve` instead of editing from a critique-only run. If the user asks to turn the consideration output into code, use `ras-implement` with a precise work item or `ras implement --from-run <run-id>` when the synthesis is suitable.
+If the user asks to resolve findings in the document itself, apply the Approach Gate first. Only use `ras-consider-resolve` when the findings are document-level edits or the operator has chosen the approach; if the synthesis says the foundation is wrong or undecided, keep the decision with the user and revise the plan before invoking a fixer. If the user asks to turn the consideration output into code, use `ras-implement` with a precise work item or `ras implement --from-run <run-id>` only when the synthesis is suitable and the approach is chosen.
 
 ## Safety Notes
 
 - Do not mutate the file under consideration for a consider-only request.
 - Keep GitHub posting out of consideration workflows.
 - Use `ras verify <consider-run-id>` when the user wants source-aware follow-up against the current local document.
-- Use `ras-consider-resolve` when the user wants decision capture, isolated document edits, resume/apply/abort handoff, or `ras fix <consider-run-id> --decisions <file>`.
+- Use `ras-consider-resolve` when the user wants decision capture, isolated document edits, resume/apply/abort handoff, or `ras fix <consider-run-id> --decisions <file>`, after approach-defining decisions are made or represented as `needs_human`.
 - Do not treat consideration output as an accepted plan; it is critique and synthesis for the user to decide on.
 - Treat low-severity and nit feedback separately from correctness, safety, or feasibility blockers.

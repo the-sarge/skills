@@ -1,7 +1,7 @@
 ---
 name: ras-review-loop
 description: >-
-  Use only when the user explicitly asks for a complete RAS review loop, such as "run the RAS review loop", "review-fix-verify-review", "iterate until the PR has no findings", or "keep reviewing and fixing until clean". Prefer the first-class `ras review-fix` command for supported same-repository PRs; `ras review-loop` remains supported for compatibility. Do not use for single-step requests to only run `ras review`, fix known findings, run `ras verify`, or run a fresh review.
+  Use only when the user explicitly asks for a complete RAS review loop, such as "run the RAS review loop", "review-fix-verify-review", "iterate until the PR has no findings", or "keep reviewing and fixing until clean", and the approach-risk gate says the PR foundation is sound enough for automated fixing. Prefer the first-class `ras review-fix` command for supported same-repository PRs; `ras review-loop` remains supported for compatibility. Do not use for single-step requests to only run `ras review`, fix known findings, run `ras verify`, or run a fresh review.
 ---
 
 # RAS Review Loop
@@ -17,7 +17,7 @@ For same-repository PRs, `ras review-fix` is the primary path. It creates a RAS-
 ```text
 outer review loop:
   ras review <pr>
-  if review judgment is clean: done
+  if review has no blocking findings: apply low/nit policy, then done
 
   inner fix loop:
     fix blocking review synthesis items
@@ -29,6 +29,14 @@ outer review loop:
 ```
 
 This skill does not merge the PR, update task trackers, append the development journal, or perform release cleanup. Those are separate user requests.
+
+## Approach Risk Gate
+
+Use `ras review-fix` only when the PR's foundation is likely sound and the loop should apply patches to known feedback. Before running it, ask whether likely findings could mean the chosen approach should be abandoned. If yes, run one-shot `ras review` first and stop after reading the synthesis; do not attach a builder to the first critical signal.
+
+Treat foundational critical/high findings as a stop condition: the process model, concurrency model, auth/security boundary, migration strategy, API/architecture direction, parser/protocol strategy, or dependency choice is wrong. Report these to the user instead of trying multiple builder iterations to preserve the current design.
+
+Keep the auto-fixer for patches on a sound foundation: missing checks or tests, straightforward correctness bugs, validation gaps, localized refactors, documentation fixes, and config fixes. Always use bounded caps (`--max-review-loops`, `--max-fix-loops`, and effective `--max-iters`) and stop if the same blocker recurs after an attempted fix.
 
 ## Before Running
 
@@ -71,7 +79,7 @@ Default to the project config for loop limits and model profiles unless the user
 
 `ras review-fix` can be long-running and quiet. Wait for completion, then read the final handoff. Do not infer success from silence or from an exit code alone; the final status and synthesis content determine whether the loop is complete.
 
-While a review-fix/review-loop command is running, monitor that command's own output as the primary progress source. `ras status`, `ras show`, `ras report`, and `ras serve` are appropriate for explicit diagnostics or after the loop exits, but do not turn them into a polling loop.
+While a review-fix/review-loop command is running, monitor that command's own output as the primary progress source. `ras status`, `ras show`, `ras report`, and `ras serve` are appropriate for explicit diagnostics or after the loop exits, but do not turn them into a polling loop. For structured diagnostics during quiet periods, prefer `ras status <run-id> --json` or `ras show <run-id> --json` so agents can read run status, artifacts, agent rounds, verification records, and any available synthesis without scraping human output.
 
 When reporting back, include:
 
@@ -90,6 +98,8 @@ Other agents may run separate plain `ras review` commands against different PRs 
 ## Manual Fallback
 
 Use the manual loop only when `ras review-fix` or `ras review-loop` is unavailable, the PR is unsupported by the first-class command, or the user explicitly asks the current agent to edit the PR directly.
+
+Manual fallback is subject to the same Approach Risk Gate as `ras review-fix`. If the synthesis contains foundational critical/high findings, stop before edits and ask the operator whether to abandon or redesign, patch in place, or split follow-up work.
 
 Before manual edits, ensure the local checkout is on the PR head branch and matches the PR head SHA, or deliberately switch/fetch before editing. If the PR head moved unexpectedly, stop.
 
@@ -113,7 +123,8 @@ The inner fix loop is a hard gate. Do not run a fresh `ras review` while `ras ve
 
 Read the complete synthesis before editing.
 
-- Act on `Fix First` findings unless they are technically wrong for the codebase.
+- Treat foundational critical/high `Fix First` findings as an operator decision point before any edits.
+- Act on patch-level `Fix First` findings unless they are technically wrong for the codebase.
 - Do not act on `Do Not Act On` items.
 - Merge duplicate clusters mentally so one code change resolves one root cause.
 - If a finding is unclear, speculative, or conflicts with code reality, stop and ask the user instead of guessing.
@@ -123,11 +134,18 @@ Read the complete synthesis before editing.
 
 For manual fallback, classify each review or verify result before deciding whether to continue the loop.
 
+- Foundational stop: critical/high findings that say the process model, concurrency model, auth/security boundary, migration strategy, API/architecture direction, parser/protocol strategy, or dependency choice is wrong. Ask the operator for direction before editing or continuing the loop.
 - Blocking: correctness, safety, data loss, merge-readiness, broken tests, missing required coverage, or findings the synthesis marks as required fixes.
 - Non-blocking: low-severity and nit polish that is not required for correctness, safety, or merge-readiness.
 - Failed/unclear: contradictory, speculative, or technically questionable output.
 
-Fix blocking items. Fix cheap, clear non-blocking items while already in the area, but do not let low/nit findings hold the loop hostage. Create or recommend follow-up issues for non-blocking work that would slow progress. Ask the user when the judgment is unclear.
+Low/nit handling is a loop-control policy, not just a prioritization hint:
+
+- If low/nit findings appear alongside blocking findings, fix cheap and local low/nit items only while already editing and while another verify/review cycle is already required for blockers.
+- If the only remaining findings are low/nit and any are not docs-only, do not fix them now, even if they look cheap. Create or recommend follow-up issues, report them separately from blockers, and treat the loop as clean for merge-readiness.
+- If the only remaining findings are low/nit docs-only findings, fix them only when the edit is cheap and correctness is very high confidence. After such a docs-only polish fix, do not run another `ras review`, `ras verify`, or full RAS loop solely for that change; run only lightweight local docs checks and report that the RAS re-run was intentionally skipped by policy.
+
+Fix blocking items. Ask the user when the judgment is unclear.
 
 A timed-out, terminated, or no-synthesis `ras review` / `ras verify` run is not clean. Treat it as failed/unclear, report the command problem, and do not advance to the next gate based on partial output.
 
@@ -185,9 +203,9 @@ When `ras verify` reports no open items, run a fresh review:
 ras review https://github.com/<owner>/<repo>/pull/<number>
 ```
 
-If the fresh review has actionable findings, start a new iteration using that new review run id.
+If the fresh review has blocking findings, start a new iteration using that new review run id. If it has only low/nit findings, apply the low/nit policy and do not start another iteration solely for those findings.
 
-Stop when the fresh review reports no actionable findings. Report the final review run id, the pushed head, and the verification commands that passed.
+Stop when the fresh review reports no blocking findings after the low/nit policy is applied. Report the final review run id, the pushed head, and the verification commands that passed.
 
 Default to at most three outer review loops and three inner fix/verify attempts per review unless the user asks otherwise. Stop and ask if the same findings recur or if each fresh review finds unrelated new issues.
 
@@ -198,4 +216,4 @@ Default to at most three outer review loops and three inner fix/verify attempts 
 - Do not skip required mutation checks when the synthesis requests them.
 - Do not force-push unless the user explicitly asks.
 - Do not merge the PR or update external trackers as part of this skill.
-- If repeated review iterations find unrelated new issues or non-blocking low/nit polish, ask the user whether to continue the loop or split follow-up work into issues.
+- If repeated review iterations find unrelated new blocking issues, ask the user whether to continue the loop or split follow-up work into issues.
