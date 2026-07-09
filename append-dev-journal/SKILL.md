@@ -36,6 +36,13 @@ Body sections are adaptive. Use only the sections supported by the evidence:
   PR/issue state when available, validation output, and explicit user context.
 - Do not invent board status, issue closures, test results, merge state, or
   future work. If a material fact is missing or ambiguous, ask before appending.
+- When a canonical decision record exists (issue-tracker resolution, ADR,
+  planning map), a `Decisions` line is: the decision's gist (a line or two)
+  plus a link to that record. The record holds the rationale and detail; the
+  journal points at it.
+- `Next` is a snapshot as of the entry timestamp. When a live work-tracking
+  surface exists (tracker, board, map), a `Next` line is: the snapshot gist
+  plus a link naming that surface as the live view.
 - Keep entries append-only historical records. Do not revise old entries as part
   of an append.
 - If the user supplies final `entry_body_markdown`, append that body after
@@ -59,21 +66,23 @@ explicitly asks for a legacy/custom format.
 
 ## Helper Script
 
-Use `scripts/dev_journal.py` for deterministic mechanics. Run it from the repo
-where the journal should be updated.
+Use `scripts/dev_journal.py` for deterministic mechanics. It lives inside this
+skill's base directory — the path announced when the skill loads; `<skill-base-dir>`
+below stands for that path. Run it from the repo where the journal should be
+updated.
 
 Preview without writing:
 
 ```bash
-python3 /Users/josh/.codex/skills/append-dev-journal/scripts/dev_journal.py \
-  preview --title "Short title" --actor "Codex" --body-file /path/to/body.md
+python3 <skill-base-dir>/scripts/dev_journal.py \
+  preview --title "Short title" --actor "<actor>" --body-file /path/to/body.md
 ```
 
 Append after inspecting the preview:
 
 ```bash
-python3 /Users/josh/.codex/skills/append-dev-journal/scripts/dev_journal.py \
-  append --title "Short title" --actor "Codex" --body-file /path/to/body.md
+python3 <skill-base-dir>/scripts/dev_journal.py \
+  append --title "Short title" --actor "<actor>" --body-file /path/to/body.md
 ```
 
 Useful options:
