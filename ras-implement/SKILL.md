@@ -41,7 +41,19 @@ printf '%s\n' "$WORK_ITEM" | ras implement --stdin
 ras implement --from-run <run-id>
 ```
 
-Prefer a markdown file when the work is non-trivial, needs reviewable acceptance criteria, or should be committed with the repo. Use `--task` for small, self-contained fixes. Use `--stdin` for generated multi-paragraph work items that should not become repo files. Use `--from-run` when implementing a synthesized RAS fix queue from a previous run.
+Prefer a markdown file when the work is non-trivial, needs reviewable acceptance criteria, or should be committed with the repo. Use `--task` for small, self-contained fixes. Use `--stdin` for generated multi-paragraph work items that should not become repo files. Use `--from-run` only when the user explicitly authorizes the entire stored synthesis as the work item; otherwise apply the structured disposition policy below and construct the authorized work item with a file or `--stdin`.
+
+### Route Structured Dispositions
+
+Before turning a prior run into implementation, inspect it with `ras show <run-id> --json`. Treat synthesis dispositions as classification facts, not workflow commands:
+
+- `fix_first`: include in the implementation work item only when the user requested mutation.
+- `follow_up` with `needs_more_evidence`: report it and offer investigation; exclude it from builder work.
+- `follow_up` with `architecture_review`: report it and offer a separate architecture review or grill; exclude it from builder work.
+- `do_not_act`: summarize it without action.
+- `omitted`: keep it inspectable but outside the normal action queue.
+
+Create no issue and start no additional workflow without the user authorization required for that mutation or workflow. When structured dispositions are available, build a precise work item containing only authorized `fix_first` items and pass the remaining classifications as clearly non-authorizing context when relevant. When dispositions are absent or unavailable, do not infer them from synthesis Markdown; summarize the limitation and ask the user to authorize a scope, unless the user already explicitly requested `--from-run` over the entire synthesis.
 
 Markdown work items may include frontmatter:
 

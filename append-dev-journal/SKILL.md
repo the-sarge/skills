@@ -133,6 +133,7 @@ The script:
      intended remote/branch from git metadata or user context.
    - After pushing, verify `git status --short -- <journal-path>` is clean and
      capture the commit SHA for the final response.
+8. Merge
 
 ## Failure Cases
 
