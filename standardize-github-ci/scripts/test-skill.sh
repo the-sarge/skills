@@ -5,6 +5,16 @@ skill_root="$(cd "$(dirname "$0")/.." && pwd)"
 audit="$skill_root/scripts/audit-ci.sh"
 classify="$skill_root/assets/classify-ci-changes.sh"
 require_results="$skill_root/assets/require-ci-results.sh"
+workflow_template="$skill_root/assets/ci.yml.template"
+
+command -v yq >/dev/null || {
+  printf 'error: yq is required to validate the workflow template\n' >&2
+  exit 1
+}
+yq eval '.' "$workflow_template" >/dev/null
+if command -v actionlint >/dev/null; then
+  actionlint "$workflow_template"
+fi
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT

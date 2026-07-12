@@ -74,13 +74,12 @@ Proceed only when the user explicitly asks to implement or has approved the plan
 Validate in proportion to the change:
 
 1. Run the repository's workflow contract tests and `actionlint` when available.
-2. Run `scripts/test-skill.sh` when modifying this skill's bundled scripts or assets.
-3. Parse every edited YAML file.
-4. Run changed shell-script tests or at minimum syntax checks plus representative fixtures.
-5. Run Taskfile lanes affected by the refactor when the required toolchain and credentials are available.
-6. Re-run `scripts/audit-ci.sh` and resolve new policy warnings or document justified exceptions.
-7. Model at least these paths: docs-only PR, source PR, dependency change, workflow change, superseding PR commit, protected merge to the default branch, schedule, manual dispatch, and release tag when applicable.
-8. If authorized to open a test PR, observe actual check names and skipped-job behavior before changing required checks.
+2. Parse every edited YAML file.
+3. Run changed shell-script tests or at minimum syntax checks plus representative fixtures.
+4. Run Taskfile lanes affected by the refactor when the required toolchain and credentials are available.
+5. Re-run `scripts/audit-ci.sh` and resolve new policy warnings or document justified exceptions.
+6. Model at least these paths: docs-only PR, source PR, dependency change, workflow change, superseding PR commit, protected merge to the default branch, schedule, manual dispatch, and release tag when applicable.
+7. If authorized to open a test PR, observe actual check names and skipped-job behavior before changing required checks.
 
 Do not claim that a workflow saves minutes merely because YAML parses. Explain which jobs no longer start and under which events.
 
