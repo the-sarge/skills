@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  ci-required:
+    name: ci-required
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      docs_only: ${{ steps.changes.outputs.docs_only }}
+      source_changed: ${{ steps.changes.outputs.source_changed }}
+      dependencies_changed: ${{ steps.changes.outputs.dependencies_changed }}
+      workflows_changed: ${{ steps.changes.outputs.workflows_changed }}
+      platform_changed: ${{ steps.changes.outputs.platform_changed }}
+      release_changed: ${{ steps.changes.outputs.release_changed }}
+    steps:
+      # Replace action tags and tool versions with repository-approved immutable pins.
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - id: changes
+        env:
+          CI_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          CI_HEAD_SHA: ${{ github.sha }}
+        run: ./scripts/classify-ci-changes.sh
+
+      # Keep this command equivalent to `task docs-check` without installing a language toolchain merely to invoke Task.
+      - name: Validate documentation
+        if: steps.changes.outputs.docs_only == 'true'
+        run: ./scripts/check-docs.sh
+
+      - name: Set up Go
+        if: steps.changes.outputs.docs_only != 'true'
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Validate source
+        if: steps.changes.outputs.docs_only != 'true'
+        run: go run github.com/go-task/task/v3/cmd/task@v3.51.1 check
+
+  # Add expensive jobs only when repository evidence requires them. Gate them with `needs: ci-required` and the outputs above.
