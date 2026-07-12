@@ -1,6 +1,6 @@
 ---
 name: standardize-github-ci
-description: Audit, plan, implement, and verify efficient GitHub Actions CI for one repository at a time, with Taskfile validation lanes, change-aware job routing, stable required checks, concurrency, timeouts, runner-cost controls, and approval-gated GitHub settings changes. Use when the user asks to inspect CI waste, standardize workflows, prevent docs-only changes from running full suites, reduce Actions minutes, refactor Taskfile/Actions configuration, or apply the portfolio CI policy to a repository.
+description: Standardize GitHub Actions CI for one repository at a time through read-only audit, approval-gated planning and implementation, and verification. Use for Actions-usage audits, Taskfile or workflow refactors, or applying the portfolio CI policy to a repository.
 ---
 
 # Standardize GitHub CI
@@ -21,10 +21,11 @@ Never treat an audit or plan request as authorization to edit files, change GitH
 ## Load policy and instructions
 
 1. Read repository `AGENTS.md` files that govern the target paths.
-2. Read [references/ci-policy.md](references/ci-policy.md) completely.
-3. Run `scripts/audit-ci.sh <repository-path>` for deterministic local evidence when the repository is checked out.
-4. Treat the current GitHub default branch as authoritative when the checkout may be stale. Use read-only `gh` queries rather than fetching into or modifying a user worktree.
-5. Inspect Taskfile tasks invoked by CI, not just workflow YAML.
+2. Read [references/ci-policy.md](references/ci-policy.md) completely for every mode.
+3. Read [references/migration.md](references/migration.md) completely in `plan` and `apply` modes.
+4. Run `scripts/audit-ci.sh <repository-path>` for deterministic local evidence when the repository is checked out.
+5. Treat the current GitHub default branch as authoritative when the checkout may be stale. Use read-only `gh` queries rather than fetching into or modifying a user worktree.
+6. Inspect Taskfile tasks invoked by CI, not just workflow YAML.
 
 ## Audit
 
@@ -53,8 +54,6 @@ Produce a migration that includes:
 - exceptions to the default policy with repository evidence;
 - an estimate or qualitative ranking of savings.
 
-Do not make a workflow-level `paths` filter the sole mechanism for a required check. GitHub can leave an entirely skipped required workflow pending. Prefer an always-triggered workflow with conditional internal jobs and a stable final gate.
-
 ## Apply
 
 Proceed only when the user explicitly asks to implement or has approved the plan.
@@ -62,9 +61,9 @@ Proceed only when the user explicitly asks to implement or has approved the plan
 1. Inspect git status and preserve user-owned changes.
 2. Follow repository branch/worktree instructions. Use an isolated worktree for non-trivial or overlapping work.
 3. Adapt assets rather than copying them blindly:
-   - [assets/classify-ci-changes.sh](assets/classify-ci-changes.sh) provides fail-closed change categories.
-   - [assets/ci.yml.template](assets/ci.yml.template) demonstrates the efficient single-required-job default.
-   - [assets/require-ci-results.sh](assets/require-ci-results.sh) provides final-gate result validation only when a repository genuinely needs multiple independently required jobs.
+   - Use [assets/classify-ci-changes.sh](assets/classify-ci-changes.sh) for fail-closed change categories.
+   - Use [assets/ci.yml.template](assets/ci.yml.template) when required validation spans conditional jobs.
+   - Use [assets/require-ci-results.sh](assets/require-ci-results.sh) to validate every job contributing to a final required gate.
 4. Keep repository-specific commands in the Taskfile or existing scripts. Keep event, runner, dependency, and cancellation policy in workflow YAML.
 5. Preserve or deliberately transition required check names. Do not change rulesets, branch protection, Actions budgets, secrets, variables, runner groups, or repository settings without explicit authorization for those external mutations.
 6. Pin third-party actions according to repository policy. Do not copy stale versions from the assets.
@@ -75,18 +74,19 @@ Proceed only when the user explicitly asks to implement or has approved the plan
 Validate in proportion to the change:
 
 1. Run the repository's workflow contract tests and `actionlint` when available.
-2. Parse every edited YAML file.
-3. Run changed shell-script tests or at minimum syntax checks plus representative fixtures.
-4. Run Taskfile lanes affected by the refactor when the required toolchain and credentials are available.
-5. Re-run `scripts/audit-ci.sh` and resolve new policy warnings or document justified exceptions.
-6. Model at least these paths: docs-only PR, source PR, dependency change, workflow change, superseding PR commit, protected merge to the default branch, schedule, manual dispatch, and release tag when applicable.
-7. If authorized to open a test PR, observe actual check names and skipped-job behavior before changing required checks.
+2. Run `scripts/test-skill.sh` when modifying this skill's bundled scripts or assets.
+3. Parse every edited YAML file.
+4. Run changed shell-script tests or at minimum syntax checks plus representative fixtures.
+5. Run Taskfile lanes affected by the refactor when the required toolchain and credentials are available.
+6. Re-run `scripts/audit-ci.sh` and resolve new policy warnings or document justified exceptions.
+7. Model at least these paths: docs-only PR, source PR, dependency change, workflow change, superseding PR commit, protected merge to the default branch, schedule, manual dispatch, and release tag when applicable.
+8. If authorized to open a test PR, observe actual check names and skipped-job behavior before changing required checks.
 
 Do not claim that a workflow saves minutes merely because YAML parses. Explain which jobs no longer start and under which events.
 
 ## Deliver
 
-Lead with the outcome. State:
+State:
 
 - mode completed;
 - files or settings changed, if any;

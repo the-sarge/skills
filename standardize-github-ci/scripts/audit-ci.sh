@@ -12,6 +12,7 @@ require_command() {
 }
 
 require_command git
+require_command jq
 require_command rg
 require_command yq
 
@@ -86,9 +87,18 @@ $1"
 trigger_state() {
   workflow_file="$1"
   trigger="$2"
-  if test "$(yq -r ".on | has(\"$trigger\")" "$workflow_file")" != true; then
+  on_json="$(yq -o=json -I=0 '.on // {}' "$workflow_file")"
+  if ! printf '%s\n' "$on_json" | jq -e --arg trigger "$trigger" '
+    if type == "string" then . == $trigger
+    elif type == "array" then index($trigger) != null
+    elif type == "object" then has($trigger)
+    else false
+    end
+  ' >/dev/null; then
     printf 'absent\n'
-  elif test "$(yq -r "((.on.$trigger // {}) | has(\"paths\")) or ((.on.$trigger // {}) | has(\"paths-ignore\"))" "$workflow_file")" = true; then
+  elif printf '%s\n' "$on_json" | jq -e --arg trigger "$trigger" '
+    type == "object" and (.[$trigger] | type == "object") and ((.[$trigger] | has("paths")) or (.[$trigger] | has("paths-ignore")))
+  ' >/dev/null; then
     printf 'filtered\n'
   else
     printf 'unfiltered\n'

@@ -1,5 +1,23 @@
 # Portfolio GitHub CI Policy
 
+## Contents
+
+- [Purpose](#purpose)
+- [Responsibility boundary](#responsibility-boundary)
+- [Required defaults](#required-defaults)
+  - [Stable required gate](#stable-required-gate)
+  - [Change classification](#change-classification)
+  - [Validation lanes](#validation-lanes)
+  - [Event policy](#event-policy)
+  - [Concurrency](#concurrency)
+  - [Timeouts](#timeouts)
+  - [Job ordering](#job-ordering)
+  - [Runner policy](#runner-policy)
+  - [Duplicate-work policy](#duplicate-work-policy)
+  - [Security policy](#security-policy)
+  - [Caching and artifacts](#caching-and-artifacts)
+  - [Schedules](#schedules)
+
 ## Purpose
 
 Reduce GitHub-hosted runner consumption and feedback latency without weakening meaningful correctness, security, platform, or release coverage. Apply these defaults through repository-specific evidence rather than identical workflow files.
@@ -17,6 +35,8 @@ Reduce GitHub-hosted runner consumption and feedback latency without weakening m
 ### Stable required gate
 
 Keep one always-created required check with a stable name such as `ci-required`. Let it validate the results of conditional jobs. Avoid requiring every conditional platform or security job separately.
+
+Prefer one required job with conditional steps when all required validation can run on one runner. When required validation spans conditional or runner-specific jobs, put `ci-required` last, declare every contributing job in `needs`, and fail unless every required result succeeded or was intentionally skipped.
 
 Do not rely only on workflow-level `paths` or `paths-ignore` for a required workflow. An entirely skipped required workflow may remain pending. A conditionally skipped job reports success, making job-level routing safer for required checks.
 
@@ -124,29 +144,3 @@ Cache immutable dependency downloads when repository policy permits it. Do not c
 ### Schedules
 
 Stagger schedules away from the top of the hour and across repositories. Give every scheduled workflow a concurrency policy and timeout. Disable redundant schedules in legacy or superseded repositories.
-
-## Required planning questions
-
-Answer these before implementation:
-
-1. Which check names are currently required?
-2. Are direct pushes to the default branch possible?
-3. Which documentation is generated from code?
-4. Does the repository contain cgo, OS-specific files, GUI code, installers, or native libraries?
-5. Which private dependencies, credentials, or self-hosted runners are required?
-6. Which checks detect time-varying external risk?
-7. Which jobs publish, deploy, sign, attest, comment, or otherwise mutate external state?
-8. What recent changes produced unnecessary runs, and what would the proposed classifier do with them?
-
-## Rollout and observation
-
-1. Record the baseline workflow/job count and available usage data.
-2. Implement on a feature branch with existing required checks preserved where possible.
-3. Verify a docs-only PR and a source PR before changing rulesets.
-4. Change required checks only with explicit authorization after observing actual check names.
-5. Observe failures, queue time, and billing for at least several normal development cycles.
-6. Tighten path categories only from evidence; fail closed when uncertain.
-
-## Exceptions
-
-Document exceptions with the protected behavior, supporting evidence, and review condition. Examples include always scanning all files for secrets, rebuilding committed native libraries on every relevant change, or maintaining default-branch validation because direct pushes remain allowed.

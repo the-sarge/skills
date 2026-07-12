@@ -1,34 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-require_success() {
+require_result() {
   label="$1"
-  actual="$2"
-  if test "$actual" != success; then
-    printf 'error: %s result was %s, expected success\n' "$label" "${actual:-unset}" >&2
+  expected="$2"
+  actual="$3"
+  if test "$actual" != "$expected"; then
+    printf 'error: %s result was %s, expected %s\n' "$label" "${actual:-unset}" "$expected" >&2
     exit 1
   fi
 }
 
-require_skipped() {
-  label="$1"
-  actual="$2"
-  if test "$actual" != skipped; then
-    printf 'error: %s result was %s, expected skipped\n' "$label" "${actual:-unset}" >&2
-    exit 1
-  fi
-}
-
-require_success classify "${CLASSIFY_RESULT:-}"
+require_result classify success "${CLASSIFY_RESULT:-}"
 
 case "${DOCS_ONLY:-}" in
   true)
-    require_success docs "${DOCS_RESULT:-}"
-    require_skipped code "${CODE_RESULT:-}"
+    require_result docs success "${DOCS_RESULT:-}"
+    require_result code skipped "${CODE_RESULT:-}"
     ;;
   false)
-    require_skipped docs "${DOCS_RESULT:-}"
-    require_success code "${CODE_RESULT:-}"
+    require_result docs skipped "${DOCS_RESULT:-}"
+    require_result code success "${CODE_RESULT:-}"
     ;;
   *)
     printf 'error: DOCS_ONLY must be true or false\n' >&2

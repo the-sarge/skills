@@ -2,8 +2,6 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -14,44 +12,66 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  ci-required:
-    name: ci-required
+  classify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
     outputs:
       docs_only: ${{ steps.changes.outputs.docs_only }}
       source_changed: ${{ steps.changes.outputs.source_changed }}
-      dependencies_changed: ${{ steps.changes.outputs.dependencies_changed }}
-      workflows_changed: ${{ steps.changes.outputs.workflows_changed }}
-      platform_changed: ${{ steps.changes.outputs.platform_changed }}
-      release_changed: ${{ steps.changes.outputs.release_changed }}
     steps:
       # Replace action tags and tool versions with repository-approved immutable pins.
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: false
-
       - id: changes
         env:
           CI_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
           CI_HEAD_SHA: ${{ github.sha }}
         run: ./scripts/classify-ci-changes.sh
 
+  docs:
+    needs: classify
+    if: needs.classify.outputs.docs_only == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       # Keep this command equivalent to `task docs-check` without installing a language toolchain merely to invoke Task.
-      - name: Validate documentation
-        if: steps.changes.outputs.docs_only == 'true'
-        run: ./scripts/check-docs.sh
+      - run: ./scripts/check-docs.sh
 
-      - name: Set up Go
-        if: steps.changes.outputs.docs_only != 'true'
-        uses: actions/setup-go@v6
+  code:
+    needs: classify
+    if: needs.classify.outputs.docs_only != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
+      - run: go run github.com/go-task/task/v3/cmd/task@v3.51.1 check
 
-      - name: Validate source
-        if: steps.changes.outputs.docs_only != 'true'
-        run: go run github.com/go-task/task/v3/cmd/task@v3.51.1 check
+  ci-required:
+    name: ci-required
+    if: ${{ !cancelled() }}
+    needs: [classify, docs, code]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - env:
+          CLASSIFY_RESULT: ${{ needs.classify.result }}
+          DOCS_ONLY: ${{ needs.classify.outputs.docs_only }}
+          DOCS_RESULT: ${{ needs.docs.result }}
+          CODE_RESULT: ${{ needs.code.result }}
+        run: ./scripts/require-ci-results.sh
 
-  # Add expensive jobs only when repository evidence requires them. Gate them with `needs: ci-required` and the outputs above.
+  # Add every additional required job to `ci-required.needs` and validate its result before allowing the gate to pass.
