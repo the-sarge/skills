@@ -1,4 +1,4 @@
 interface:
   display_name: "Standardize GitHub CI"
-  short_description: "Audit and optimize repository CI safely"
-  default_prompt: "Use $standardize-github-ci to audit this repository’s GitHub Actions and propose an approval-gated standardization plan."
+  short_description: "Audit and gate GitHub CI after RAS review"
+  default_prompt: "Use $standardize-github-ci to audit and, with approval, implement RAS-first exact-head GitHub CI certification for this repository."

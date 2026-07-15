@@ -34,7 +34,32 @@ printf -- '- Branch: `%s`\n' "$(git -C "$repo_root" branch --show-current 2>/dev
 printf -- '- HEAD: `%s`\n' "$(git -C "$repo_root" rev-parse --short HEAD)"
 printf -- '- Origin: `%s`\n' "$(git -C "$repo_root" remote get-url origin 2>/dev/null || printf 'none')"
 status_count="$(git -C "$repo_root" status --short | wc -l | tr -d ' ')"
-printf -- '- Worktree changes: `%s`\n\n' "$status_count"
+printf -- '- Worktree changes: `%s`\n' "$status_count"
+
+case "${CI_USES_RAS:-}" in
+  true)
+    uses_ras=true
+    ras_source='CI_USES_RAS=true'
+    ;;
+  false)
+    uses_ras=false
+    ras_source='CI_USES_RAS=false'
+    ;;
+  "")
+    if test -f "$repo_root/.ras/config.yaml" || rg -qi --hidden --glob '!.git/**' 'ras[[:space:]]+(review|verify|review-fix|review-loop)|RAS[- ]first|RAS review' "$repo_root"; then
+      uses_ras=true
+      ras_source='repository evidence'
+    else
+      uses_ras=false
+      ras_source='not detected'
+    fi
+    ;;
+  *)
+    printf 'error: CI_USES_RAS must be true, false, or unset\n' >&2
+    exit 2
+    ;;
+esac
+printf -- '- RAS-first review gate: `%s` (%s)\n\n' "$uses_ras" "$ras_source"
 
 printf '## Build entry points\n\n'
 entry_points="$(find "$repo_root" -maxdepth 1 -type f \( -iname 'taskfile.yml' -o -iname 'taskfile.yaml' -o -name 'Makefile' -o -name 'Justfile' \) -print | sort)"
@@ -105,6 +130,30 @@ trigger_state() {
   fi
 }
 
+dispatch_sha_binding_state() {
+  workflow="$1"
+  sha_inputs="$(yq -r '(.on.workflow_dispatch.inputs // {}) | keys | .[]' "$workflow" | rg -i '(^|_)(expected|reviewed|head)?_?sha($|_)' || true)"
+  test -n "$sha_inputs" || {
+    printf 'not detected'
+    return
+  }
+
+  jobs_json="$(yq -o=json -I=0 '.jobs // {}' "$workflow")"
+  while IFS= read -r sha_input; do
+    test -n "$sha_input" || continue
+    if printf '%s\n' "$jobs_json" | rg -Fq "inputs.$sha_input" && printf '%s\n' "$jobs_json" | rg -q 'GITHUB_SHA|github\.sha'; then
+      printf 'detected; verify the comparison fails closed'
+      return
+    fi
+  done <<< "$sha_inputs"
+
+  printf 'not detected'
+}
+
+manual_workflow_count=0
+automatic_pr_workflow_count=0
+exact_head_dispatch_count=0
+
 while IFS= read -r workflow; do
   test -n "$workflow" || continue
   rel="$(relative_path "$workflow")"
@@ -117,7 +166,9 @@ while IFS= read -r workflow; do
     concurrency_state=missing
   fi
   pr_state="$(trigger_state "$workflow" pull_request)"
+  pr_target_state="$(trigger_state "$workflow" pull_request_target)"
   push_state="$(trigger_state "$workflow" push)"
+  dispatch_state="$(trigger_state "$workflow" workflow_dispatch)"
   missing_timeouts="$(yq -r '[.jobs // {} | to_entries[] | select(.value["timeout-minutes"] == null) | .key] | join(", ")' "$workflow")"
   runners="$(yq -r '(.jobs // {}) | to_entries | .[] | "\(.key)=\(.value[\"runs-on\"] | @json)"' "$workflow")"
 
@@ -125,7 +176,19 @@ while IFS= read -r workflow; do
   printf -- '- Jobs: `%s`\n' "$job_count"
   printf -- '- Triggers: `%s`\n' "$trigger_json"
   printf -- '- Pull request paths: `%s`\n' "$pr_state"
+  printf -- '- Pull request target paths: `%s`\n' "$pr_target_state"
   printf -- '- Push paths: `%s`\n' "$push_state"
+  if test "$dispatch_state" = absent; then
+    printf -- '- Manual dispatch: absent\n'
+  else
+    printf -- '- Manual dispatch: present\n'
+    manual_workflow_count=$((manual_workflow_count + 1))
+    dispatch_sha_binding="$(dispatch_sha_binding_state "$workflow")"
+    printf -- '- Exact-head dispatch binding: `%s`\n' "$dispatch_sha_binding"
+    if test "$dispatch_sha_binding" != 'not detected'; then
+      exact_head_dispatch_count=$((exact_head_dispatch_count + 1))
+    fi
+  fi
   printf -- '- Concurrency: `%s`\n' "$concurrency_state"
   if test -n "$missing_timeouts"; then
     printf -- '- Jobs missing timeouts: `%s`\n' "$missing_timeouts"
@@ -138,7 +201,7 @@ while IFS= read -r workflow; do
   done <<< "$runners"
   printf '\n'
 
-  if test "$concurrency_state" = missing && { test "$pr_state" != absent || test "$push_state" != absent; }; then
+  if test "$concurrency_state" = missing && { test "$pr_state" != absent || test "$pr_target_state" != absent || test "$push_state" != absent; }; then
     append_signal "WARN $rel: automatic workflow has no concurrency policy"
   fi
   if test -n "$missing_timeouts"; then
@@ -146,6 +209,15 @@ while IFS= read -r workflow; do
   fi
   if test "$pr_state" = unfiltered; then
     append_signal "REVIEW $rel: pull_request trigger is not path-filtered; use internal classification when the check is required"
+  fi
+  if test "$pr_target_state" != absent; then
+    append_signal "SECURITY $rel: pull_request_target requires explicit untrusted-code and secret-boundary review"
+  fi
+  if test "$pr_state" != absent || test "$pr_target_state" != absent; then
+    automatic_pr_workflow_count=$((automatic_pr_workflow_count + 1))
+    if test "$uses_ras" = true; then
+      append_signal "RAS-COST $rel: automatically starts on pull request updates before the RAS gate settles; separate preflight or use dispatch-gated certification"
+    fi
   fi
   if test "$push_state" = unfiltered; then
     append_signal "REVIEW $rel: push trigger is not path-filtered; check for full PR plus merged-push duplication"
@@ -157,6 +229,17 @@ while IFS= read -r workflow; do
     append_signal "DUPLICATE $rel: contains both ordinary and race runs of ./..."
   fi
 done <<< "$workflow_list"
+
+if test "$uses_ras" = true && test "$manual_workflow_count" -eq 0; then
+  append_signal "RAS-BLOCKER repository: no workflow_dispatch path exists for post-RAS certification"
+elif test "$uses_ras" = true && test "$exact_head_dispatch_count" -eq 0; then
+  append_signal "RAS-BLOCKER repository: manual dispatch exists but no exact-head SHA binding evidence was detected; verify an equivalent fail-closed guard or add one"
+fi
+
+printf '## RAS sequencing\n\n'
+printf -- '- Automatic pull-request workflows: `%s`\n' "$automatic_pr_workflow_count"
+printf -- '- Manual-dispatch workflows: `%s`\n' "$manual_workflow_count"
+printf -- '- Exact-head dispatch candidates: `%s`\n\n' "$exact_head_dispatch_count"
 
 printf '## Cross-file duplication signals\n\n'
 search_files=("$workflow_dir")
@@ -180,4 +263,4 @@ else
   done <<< "$signals"
 fi
 
-printf '\nThis report is read-only and mechanical. Confirm required checks, changed-file semantics, recent runs, billing, private dependencies, generated docs, and platform constraints separately.\n'
+printf '\nThis report is read-only and mechanical. Confirm required checks, changed-file semantics, recent runs, billing, private dependencies, generated docs, platform constraints, and any RAS-reviewed-to-dispatched SHA handoff separately.\n'

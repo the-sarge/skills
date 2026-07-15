@@ -1,15 +1,24 @@
 name: CI
 
+# Keep PR certification dispatch-only. Add a default-branch push trigger only when repository protection or deployment evidence requires it.
 on:
-  pull_request:
   workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact RAS-reviewed head SHA to certify
+        required: true
+        type: string
+      base_sha:
+        description: Optional base SHA for change classification; omission fails closed to the code lane
+        required: false
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   classify:
@@ -19,6 +28,15 @@ jobs:
       docs_only: ${{ steps.changes.outputs.docs_only }}
       source_changed: ${{ steps.changes.outputs.source_changed }}
     steps:
+      - name: Require the RAS-reviewed head
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          test "$GITHUB_SHA" = "$EXPECTED_SHA" || {
+            printf 'error: dispatched head %s does not match RAS-reviewed head %s\n' "$GITHUB_SHA" "$EXPECTED_SHA" >&2
+            exit 1
+          }
       # Replace action tags and tool versions with repository-approved immutable pins.
       - uses: actions/checkout@v6
         with:
@@ -26,7 +44,7 @@ jobs:
           persist-credentials: false
       - id: changes
         env:
-          CI_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          CI_BASE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.base_sha || github.event.before }}
           CI_HEAD_SHA: ${{ github.sha }}
         run: ./scripts/classify-ci-changes.sh
 
