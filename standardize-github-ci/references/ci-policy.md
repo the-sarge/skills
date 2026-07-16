@@ -6,7 +6,7 @@
 - [Responsibility boundary](#responsibility-boundary)
 - [Required defaults](#required-defaults)
   - [Stable required gate](#stable-required-gate)
-  - [RAS-first certification](#ras-first-certification)
+  - [Agent-gated validation](#agent-gated-validation)
   - [Change classification](#change-classification)
   - [Validation lanes](#validation-lanes)
   - [Event policy](#event-policy)
@@ -29,32 +29,36 @@ Reduce GitHub-hosted runner consumption and feedback latency without weakening m
 |---|---|
 | GitHub workflow YAML | Events, change routing, runners, dependencies, matrices, concurrency, timeouts, permissions, caches, secrets, schedules, artifacts |
 | Taskfile and repository scripts | Portable docs, format, lint, test, race, vulnerability, build, integration, and release commands |
-| RAS and operator automation | Review the exact PR head, determine whether blockers remain, and request certification only for the reviewed head |
+| RAS and agent/operator automation | Review the exact PR head outside GitHub, determine whether blockers remain, request CI only when ready, verify the resulting run and live head, and merge that same head |
 | GitHub settings | Required checks, rulesets, Actions budgets, runner groups, secrets, variables, permissions |
 
 ## Required defaults
 
 ### Stable required gate
 
-Keep one required check with a stable name such as `ci-required`. Let it validate the results of conditional jobs. Avoid requiring every conditional platform or security job separately. In an automatically triggered workflow, create it for every relevant event; in a RAS-first workflow, create it only during explicit certification and deliberately let its absence on a new PR head block merging before dispatch.
+Keep one required result with a stable context such as `ci-required`. Let it validate the results of conditional jobs. Avoid requiring every conditional platform or security job separately. In an automatically triggered workflow, create it for every relevant event; in an agent-gated workflow, create it only during explicit validation and deliberately let its absence on a new PR head block merging before dispatch. GitHub may not credit `workflow_dispatch` job checks in the PR required-status rollup, so prove attribution live. When necessary, have the dispatched workflow publish the same generic commit-status context as pending after exact-head binding and success or failure after aggregation. Give the dispatched aggregate check a distinct display name because GitHub may require both a same-named check and commit status.
 
 Prefer one required job with conditional steps when all required validation can run on one runner. When required validation spans conditional or runner-specific jobs, put `ci-required` last, declare every contributing job in `needs`, and fail unless every required result succeeded or was intentionally skipped.
 
 Do not rely only on workflow-level `paths` or `paths-ignore` for a required workflow. An entirely skipped required workflow may remain pending. A conditionally skipped job reports success, making job-level routing safer for required checks.
 
-### RAS-first certification
+### Agent-gated validation
 
-When RAS is the repository's designated pre-merge review gate, use this cost-first sequence by default:
+When an agent runs RAS or another review process before CI, use this cost-first sequence by default:
 
 ```text
-push PR head -> RAS reviews that head -> resolve blockers -> dispatch certifying CI for the blocker-free head -> required check -> merge
+open/update PR without CI -> agent reviews exact head out of band -> resolve findings -> agent requests CI for that exact head -> verify required check and live head -> merge that same head
 ```
 
-Do not start the certifying workflow automatically on pull-request open or synchronize activity merely to make the required check appear. A new head without the required check is safely unmergeable. Prefer a manual or operator-driven dispatch path and verify that the workflow run head SHA equals the RAS-reviewed SHA. If live proof shows that GitHub excludes dispatch checks from the required PR rollup, an operator-only pull-request activity may be used instead when it revokes its one-shot trigger, binds the live head, base, and synthetic merge SHAs, and starts no run on open or synchronize. Require a fresh RAS decision plus certification after any new push.
+GitHub must remain agnostic about RAS by default. Do not represent RAS invocation or verdicts in workflow inputs, names, labels, statuses, comments, environments, or conditions. Do not start the certifying workflow automatically on `pull_request` or `pull_request_target` merely to make the required result appear. A new head without the required result is safely unmergeable. Preserve a manual or agent-driven dispatch path with generic exact-head/base inputs, verify that the workflow run head SHA and live PR head equal the requested SHA, and require a fresh agent-side review decision plus CI after any new push. A generic `ci-required` commit status is CI output, not RAS state: it may bridge a dispatched aggregate result into the PR ruleset when GitHub does not credit the job check itself. Guard terminal publication against cancellation and reject every cancelled run because cancellation can race with an already-started status request; if cancellation leaves pending, the agent aborts and requests fresh same-head CI rather than weakening the gate.
+
+The expected-SHA comparison is a race and ref-integrity guard, not an attestation that RAS passed. The default threat model trusts the agent/operator and same-repository branch writer who controls the PR, dispatch, verification, and exact-head merge. If malicious same-repository branch writers are explicitly in scope, design a trusted controller or dedicated check publisher as a separate security architecture and obtain approval for its credentials and settings; do not infer that stronger threat model merely because workflow code lives on the candidate branch.
+
+If live proof shows that GitHub excludes dispatch checks from the required PR rollup, use a generic CI mechanism that preserves the same trust boundary. A one-shot operator-only pull-request activity is admissible only when it carries no RAS meaning, revokes its trigger, binds the live head, base, and synthetic merge SHAs, and starts no run on open or synchronize.
 
 An automatic preflight may remain when its early signal justifies its cost, but it must be cheap, must not launch the expensive certification graph, and must not emit or accidentally satisfy the required certification check. Do not use a skipped required job as a pending gate.
 
-A Task target may standardize RAS invocation and CI dispatch, but it is optional. A successful `ras review` process exit does not mean the synthesis has no blockers; any wrapper must inspect the structured run result or an explicit RAS gate verdict. Persistent labels are not exact-head approvals unless automation revokes or SHA-binds them.
+A Task target may standardize agent-side RAS invocation, CI dispatch, run inspection, and exact-head merge, but it is optional. A successful `ras review` process exit does not mean the synthesis has no blockers; any wrapper must inspect the structured result before deciding to request CI. Keep that decision local to the agent rather than publishing it as GitHub workflow state.
 
 ### Change classification
 
@@ -87,18 +91,18 @@ Do not place every possible check in the PR lane merely because one Taskfile tas
 | Event | Default behavior |
 |---|---|
 | Pull request without RAS | Complete merge gate selected by changed files |
-| Pull request with RAS | No certification on open or synchronize; optional cheap preflight only, then exact-bound operator-triggered certification after RAS has no blockers |
+| Pull request with agent-side RAS | No automatic certifying CI; optional cheap preflight only, then agent-requested exact-head validation after findings are resolved |
 | Protected default-branch push | Deployment or reduced smoke; do not repeat the identical full PR suite |
 | Direct default-branch push | Complete validation only when direct pushes are possible and intentionally supported |
 | Schedule | Time-sensitive security, deep race/integration, native platform, bounded fuzzing |
-| Manual dispatch | Exact-head RAS-approved certification, exceptional diagnostics, proofs, or operator-selected deep work |
+| Manual dispatch | Agent-requested exact-head validation, exceptional diagnostics, proofs, or operator-selected deep work |
 | Tag/release | Release validation and publication |
 
 Verify protection and merge behavior before dropping default-branch validation. If the workflow cannot distinguish protected PR merges from direct pushes reliably, keep a defensible default-branch gate or eliminate direct pushes through rulesets.
 
 ### Concurrency
 
-Cancel superseded automatic pull-request work within each workflow. For RAS-first repositories, avoid starting certifying work before review; also prevent duplicate dispatches for the same ref when cancellation is safe. Keep workflow names in concurrency groups so unrelated workflows do not cancel one another. Do not cancel release publication or stateful deployment work unless its recovery model explicitly permits it.
+Cancel superseded automatic pull-request work within each workflow. For agent-gated repositories, avoid starting certifying work before the agent requests it; also prevent duplicate dispatches for the same head when cancellation is safe. Keep workflow names in concurrency groups so unrelated workflows do not cancel one another. Do not cancel release publication or stateful deployment work unless its recovery model explicitly permits it.
 
 ### Timeouts
 
@@ -113,7 +117,7 @@ Use repository evidence to adjust these numbers. A timeout is a containment boun
 
 ### Job ordering
 
-After any RAS gate, run cheap, broad failure detectors before expensive matrices:
+After the agent requests CI, run cheap, broad failure detectors before expensive matrices:
 
 ```text
 classify -> Linux/core verify -> security, native platform, integration, deep contracts

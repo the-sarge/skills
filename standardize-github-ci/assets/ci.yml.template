@@ -1,11 +1,11 @@
 name: CI
 
-# Keep PR certification dispatch-only. Add a default-branch push trigger only when repository protection or deployment evidence requires it.
+# Keep PR validation dispatch-only. The agent-side review decision is not GitHub workflow state. Add a default-branch push trigger only when repository protection or deployment evidence requires it.
 on:
   workflow_dispatch:
     inputs:
       expected_sha:
-        description: Exact RAS-reviewed head SHA to certify
+        description: Exact PR head SHA the operator intends to validate
         required: true
         type: string
       base_sha:
@@ -22,21 +22,41 @@ concurrency:
 
 jobs:
   classify:
+    permissions:
+      contents: read
+      statuses: write
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       docs_only: ${{ steps.changes.outputs.docs_only }}
       source_changed: ${{ steps.changes.outputs.source_changed }}
     steps:
-      - name: Require the RAS-reviewed head
+      # This is a race/ref-integrity guard, not proof of any external review verdict.
+      - name: Require the requested head
         if: ${{ github.event_name == 'workflow_dispatch' }}
         env:
           EXPECTED_SHA: ${{ inputs.expected_sha }}
         run: |
           test "$GITHUB_SHA" = "$EXPECTED_SHA" || {
-            printf 'error: dispatched head %s does not match RAS-reviewed head %s\n' "$GITHUB_SHA" "$EXPECTED_SHA" >&2
+            printf 'error: dispatched head %s does not match requested head %s\n' "$GITHUB_SHA" "$EXPECTED_SHA" >&2
             exit 1
           }
+      # workflow_dispatch check runs are not reliably credited in a PR's required-status rollup. This generic commit status reports CI progress only; it carries no agent-side review state.
+      - name: Mark requested CI pending
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          CI_API_URL: ${{ github.api_url }}
+          CI_EXPECTED_SHA: ${{ inputs.expected_sha }}
+          CI_STATUS_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer ${GITHUB_TOKEN}" \
+            --header "Accept: application/vnd.github+json" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            --url "${CI_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${CI_EXPECTED_SHA}" \
+            --data "{\"state\":\"pending\",\"target_url\":\"${CI_STATUS_URL}\",\"description\":\"Requested CI is running\",\"context\":\"ci-required\"}"
       # Replace action tags and tool versions with repository-approved immutable pins.
       - uses: actions/checkout@v6
         with:
@@ -76,20 +96,44 @@ jobs:
       - run: go run github.com/go-task/task/v3/cmd/task@v3.51.1 check
 
   ci-required:
-    name: ci-required
+    name: ${{ github.event_name == 'workflow_dispatch' && 'ci-dispatch-aggregate' || 'ci-required' }}
     if: ${{ !cancelled() }}
     needs: [classify, docs, code]
+    permissions:
+      contents: read
+      statuses: write
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - env:
+      - id: verify
+        continue-on-error: true
+        env:
           CLASSIFY_RESULT: ${{ needs.classify.result }}
           DOCS_ONLY: ${{ needs.classify.outputs.docs_only }}
           DOCS_RESULT: ${{ needs.docs.result }}
           CODE_RESULT: ${{ needs.code.result }}
         run: ./scripts/require-ci-results.sh
+      - name: Publish requested CI result
+        if: ${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' }}
+        env:
+          CI_API_URL: ${{ github.api_url }}
+          CI_EXPECTED_SHA: ${{ inputs.expected_sha }}
+          CI_STATUS_STATE: ${{ steps.verify.outcome == 'success' && 'success' || 'failure' }}
+          CI_STATUS_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer ${GITHUB_TOKEN}" \
+            --header "Accept: application/vnd.github+json" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            --url "${CI_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${CI_EXPECTED_SHA}" \
+            --data "{\"state\":\"${CI_STATUS_STATE}\",\"target_url\":\"${CI_STATUS_URL}\",\"description\":\"Requested CI completed\",\"context\":\"ci-required\"}"
+      - name: Enforce required CI result
+        if: ${{ steps.verify.outcome != 'success' }}
+        run: exit 1
 
   # Add every additional required job to `ci-required.needs` and validate its result before allowing the gate to pass.

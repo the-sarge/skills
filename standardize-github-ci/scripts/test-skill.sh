@@ -7,6 +7,14 @@ classify="$skill_root/assets/classify-ci-changes.sh"
 require_results="$skill_root/assets/require-ci-results.sh"
 workflow_template="$skill_root/assets/ci.yml.template"
 
+rg -q 'Keep GitHub review-system agnostic by default' "$skill_root/SKILL.md"
+rg -q 'race and ref-integrity guards, not proof' "$skill_root/SKILL.md"
+rg -q 'gh pr merge --match-head-commit <exact-pr-head>' "$skill_root/references/migration.md"
+if rg -q 'RAS|reviewed' "$workflow_template"; then
+  printf 'error: workflow template unexpectedly exposes agent-side review state\n' >&2
+  exit 1
+fi
+
 command -v yq >/dev/null || {
   printf 'error: yq is required to validate the workflow template\n' >&2
   exit 1
@@ -16,6 +24,13 @@ test "$(yq -r '.on | has("pull_request") or has("pull_request_target")' "$workfl
 test "$(yq -r '.on | has("workflow_dispatch")' "$workflow_template")" = true
 test "$(yq -r '.on.workflow_dispatch.inputs.expected_sha.required' "$workflow_template")" = true
 rg -q 'test "\$GITHUB_SHA" = "\$EXPECTED_SHA"' "$workflow_template"
+rg -q 'statuses: write' "$workflow_template"
+rg -Fq '/statuses/${CI_EXPECTED_SHA}' "$workflow_template"
+rg -q 'name: Mark requested CI pending' "$workflow_template"
+rg -q 'name: Publish requested CI result' "$workflow_template"
+rg -q 'CI_STATUS_STATE:.*steps.verify.outcome' "$workflow_template"
+rg -Fq "name: \${{ github.event_name == 'workflow_dispatch' && 'ci-dispatch-aggregate' || 'ci-required' }}" "$workflow_template"
+rg -Fq "if: \${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' }}" "$workflow_template"
 if command -v actionlint >/dev/null; then
   actionlint "$workflow_template"
 fi
@@ -106,17 +121,22 @@ on:
   workflow_dispatch:
     inputs:
       expected_sha:
-        description: Exact reviewed head
+        description: Exact requested head
         required: true
         type: string
 jobs:
   check:
+    permissions:
+      statuses: write
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - env:
           EXPECTED_SHA: ${{ inputs.expected_sha }}
         run: test "$GITHUB_SHA" = "$EXPECTED_SHA"
+      - env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: curl --request POST "https://api.github.test/repos/test/test/statuses/${EXPECTED_SHA}" --data '{"context":"ci-required"}'
       - run: 'true'
 YAML
 
@@ -210,6 +230,7 @@ test "$(printf '%s\n' "$audit_output" | rg -c 'Pull request target paths: `unfil
 test "$(printf '%s\n' "$audit_output" | rg -c 'Push paths: `unfiltered`')" = 1
 test "$(printf '%s\n' "$audit_output" | rg -c 'Manual dispatch: present')" = 1
 test "$(printf '%s\n' "$audit_output" | rg -c 'Exact-head dispatch binding: `detected; verify the comparison fails closed`')" = 1
+test "$(printf '%s\n' "$audit_output" | rg -c 'Generic commit-status bridge: `detected; verify PR ruleset attribution live`')" = 1
 if printf '%s\n' "$audit_output" | rg -q 'RAS-COST'; then
   printf 'error: non-RAS audit unexpectedly emitted a RAS cost signal\n' >&2
   exit 1
@@ -225,6 +246,7 @@ fi
 printf '%s\n' "$ras_audit_output" | rg -q 'Automatic pull-request workflows: `4`'
 printf '%s\n' "$ras_audit_output" | rg -q 'Manual-dispatch workflows: `1`'
 printf '%s\n' "$ras_audit_output" | rg -q 'Exact-head dispatch candidates: `1`'
+printf '%s\n' "$ras_audit_output" | rg -q 'Generic commit-status bridges: `1`'
 
 CLASSIFY_RESULT=success DOCS_ONLY=true DOCS_RESULT=success CODE_RESULT=skipped "$require_results" >/dev/null
 CLASSIFY_RESULT=success DOCS_ONLY=false DOCS_RESULT=skipped CODE_RESULT=success "$require_results" >/dev/null
