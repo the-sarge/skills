@@ -50,7 +50,7 @@ When RAS is the repository's designated pre-merge review gate, use this cost-fir
 push PR head -> RAS reviews that head -> resolve blockers -> dispatch certifying CI for the blocker-free head -> required check -> merge
 ```
 
-Do not start the certifying workflow automatically on `pull_request` or `pull_request_target` merely to make the required check appear. A new head without the required check is safely unmergeable. Preserve a manual or operator-driven dispatch path, verify that the workflow run head SHA equals the RAS-reviewed SHA, and require a fresh RAS decision plus certification after any new push.
+Do not start the certifying workflow automatically on pull-request open or synchronize activity merely to make the required check appear. A new head without the required check is safely unmergeable. Prefer a manual or operator-driven dispatch path and verify that the workflow run head SHA equals the RAS-reviewed SHA. If live proof shows that GitHub excludes dispatch checks from the required PR rollup, an operator-only pull-request activity may be used instead when it revokes its one-shot trigger, binds the live head, base, and synthetic merge SHAs, and starts no run on open or synchronize. Require a fresh RAS decision plus certification after any new push.
 
 An automatic preflight may remain when its early signal justifies its cost, but it must be cheap, must not launch the expensive certification graph, and must not emit or accidentally satisfy the required certification check. Do not use a skipped required job as a pending gate.
 
@@ -87,7 +87,7 @@ Do not place every possible check in the PR lane merely because one Taskfile tas
 | Event | Default behavior |
 |---|---|
 | Pull request without RAS | Complete merge gate selected by changed files |
-| Pull request with RAS | No automatic certifying CI; optional cheap preflight only, then exact-head certification after RAS has no blockers |
+| Pull request with RAS | No certification on open or synchronize; optional cheap preflight only, then exact-bound operator-triggered certification after RAS has no blockers |
 | Protected default-branch push | Deployment or reduced smoke; do not repeat the identical full PR suite |
 | Direct default-branch push | Complete validation only when direct pushes are possible and intentionally supported |
 | Schedule | Time-sensitive security, deep race/integration, native platform, bounded fuzzing |

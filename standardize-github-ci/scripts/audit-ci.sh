@@ -150,9 +150,56 @@ dispatch_sha_binding_state() {
   printf 'not detected'
 }
 
+pull_request_activity_state() {
+  workflow="$1"
+  on_json="$(yq -o=json -I=0 '.on // {}' "$workflow")"
+  if ! printf '%s\n' "$on_json" | jq -e '
+    if type == "string" then . == "pull_request"
+    elif type == "array" then index("pull_request") != null
+    elif type == "object" then has("pull_request")
+    else false
+    end
+  ' >/dev/null; then
+    printf 'absent'
+  elif printf '%s\n' "$on_json" | jq -e '
+    type == "object" and
+    (.pull_request | type == "object") and
+    ((.pull_request.types // []) == ["labeled"])
+  ' >/dev/null; then
+    printf 'label-only operator trigger'
+  else
+    printf 'automatic updates'
+  fi
+}
+
+label_certification_state() {
+  workflow="$1"
+  activity_state="$(pull_request_activity_state "$workflow")"
+  test "$activity_state" = 'label-only operator trigger' || {
+    printf 'not detected'
+    return
+  }
+
+  jobs_json="$(yq -o=json -I=0 '.jobs // {}' "$workflow")"
+  if printf '%s\n' "$jobs_json" | rg -Fq 'github.event.label.name' &&
+    printf '%s\n' "$jobs_json" | rg -Fq 'github.event.pull_request.head.sha' &&
+    printf '%s\n' "$jobs_json" | rg -Fq 'github.event.pull_request.base.sha' &&
+    printf '%s\n' "$jobs_json" | rg -Fq 'github.sha' &&
+    printf '%s\n' "$jobs_json" | rg -Fq 'merge_commit_sha' &&
+    printf '%s\n' "$jobs_json" | rg -Fq 'head.repo.full_name' &&
+    printf '%s\n' "$jobs_json" | rg -Fq 'base.repo.full_name' &&
+    printf '%s\n' "$jobs_json" | rg -Fq -- '--method DELETE' &&
+    printf '%s\n' "$jobs_json" | rg -Fq '/labels/'; then
+    printf 'detected; verify label revocation and head/base/merge comparisons fail closed'
+  else
+    printf 'not detected; label-only trigger lacks complete binding evidence'
+  fi
+}
+
 manual_workflow_count=0
 automatic_pr_workflow_count=0
 exact_head_dispatch_count=0
+label_certification_count=0
 
 while IFS= read -r workflow; do
   test -n "$workflow" || continue
@@ -166,6 +213,7 @@ while IFS= read -r workflow; do
     concurrency_state=missing
   fi
   pr_state="$(trigger_state "$workflow" pull_request)"
+  pr_activity_state="$(pull_request_activity_state "$workflow")"
   pr_target_state="$(trigger_state "$workflow" pull_request_target)"
   push_state="$(trigger_state "$workflow" push)"
   dispatch_state="$(trigger_state "$workflow" workflow_dispatch)"
@@ -176,6 +224,7 @@ while IFS= read -r workflow; do
   printf -- '- Jobs: `%s`\n' "$job_count"
   printf -- '- Triggers: `%s`\n' "$trigger_json"
   printf -- '- Pull request paths: `%s`\n' "$pr_state"
+  printf -- '- Pull request activity: `%s`\n' "$pr_activity_state"
   printf -- '- Pull request target paths: `%s`\n' "$pr_target_state"
   printf -- '- Push paths: `%s`\n' "$push_state"
   if test "$dispatch_state" = absent; then
@@ -187,6 +236,13 @@ while IFS= read -r workflow; do
     printf -- '- Exact-head dispatch binding: `%s`\n' "$dispatch_sha_binding"
     if test "$dispatch_sha_binding" != 'not detected'; then
       exact_head_dispatch_count=$((exact_head_dispatch_count + 1))
+    fi
+  fi
+  label_certification="$(label_certification_state "$workflow")"
+  if test "$pr_activity_state" = 'label-only operator trigger'; then
+    printf -- '- Label-gated certification binding: `%s`\n' "$label_certification"
+    if test "$label_certification" = 'detected; verify label revocation and head/base/merge comparisons fail closed'; then
+      label_certification_count=$((label_certification_count + 1))
     fi
   fi
   printf -- '- Concurrency: `%s`\n' "$concurrency_state"
@@ -207,17 +263,20 @@ while IFS= read -r workflow; do
   if test -n "$missing_timeouts"; then
     append_signal "WARN $rel: jobs missing timeout-minutes: $missing_timeouts"
   fi
-  if test "$pr_state" = unfiltered; then
+  if test "$pr_state" = unfiltered && test "$pr_activity_state" != 'label-only operator trigger'; then
     append_signal "REVIEW $rel: pull_request trigger is not path-filtered; use internal classification when the check is required"
   fi
   if test "$pr_target_state" != absent; then
     append_signal "SECURITY $rel: pull_request_target requires explicit untrusted-code and secret-boundary review"
   fi
-  if test "$pr_state" != absent || test "$pr_target_state" != absent; then
+  if test "$pr_activity_state" = 'automatic updates' || test "$pr_target_state" != absent; then
     automatic_pr_workflow_count=$((automatic_pr_workflow_count + 1))
     if test "$uses_ras" = true; then
       append_signal "RAS-COST $rel: automatically starts on pull request updates before the RAS gate settles; separate preflight or use dispatch-gated certification"
     fi
+  fi
+  if test "$uses_ras" = true && test "$pr_activity_state" = 'label-only operator trigger' && test "$label_certification" != 'detected; verify label revocation and head/base/merge comparisons fail closed'; then
+    append_signal "RAS-BLOCKER $rel: label-only certification lacks one-shot revocation or exact head/base/merge binding evidence"
   fi
   if test "$push_state" = unfiltered; then
     append_signal "REVIEW $rel: push trigger is not path-filtered; check for full PR plus merged-push duplication"
@@ -230,16 +289,19 @@ while IFS= read -r workflow; do
   fi
 done <<< "$workflow_list"
 
-if test "$uses_ras" = true && test "$manual_workflow_count" -eq 0; then
-  append_signal "RAS-BLOCKER repository: no workflow_dispatch path exists for post-RAS certification"
-elif test "$uses_ras" = true && test "$exact_head_dispatch_count" -eq 0; then
-  append_signal "RAS-BLOCKER repository: manual dispatch exists but no exact-head SHA binding evidence was detected; verify an equivalent fail-closed guard or add one"
+if test "$uses_ras" = true && test "$exact_head_dispatch_count" -eq 0 && test "$label_certification_count" -eq 0; then
+  if test "$manual_workflow_count" -eq 0; then
+    append_signal "RAS-BLOCKER repository: no operator-triggered exact-head certification path was detected"
+  else
+    append_signal "RAS-BLOCKER repository: operator-triggered certification exists but no exact-head binding evidence was detected"
+  fi
 fi
 
 printf '## RAS sequencing\n\n'
 printf -- '- Automatic pull-request workflows: `%s`\n' "$automatic_pr_workflow_count"
 printf -- '- Manual-dispatch workflows: `%s`\n' "$manual_workflow_count"
-printf -- '- Exact-head dispatch candidates: `%s`\n\n' "$exact_head_dispatch_count"
+printf -- '- Exact-head dispatch candidates: `%s`\n' "$exact_head_dispatch_count"
+printf -- '- Label-gated certification candidates: `%s`\n\n' "$label_certification_count"
 
 printf '## Cross-file duplication signals\n\n'
 search_files=("$workflow_dir")

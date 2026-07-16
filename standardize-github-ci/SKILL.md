@@ -38,7 +38,7 @@ Collect evidence before recommending changes:
 4. Inspect organization billing usage when readable. State any scope or permission limitation.
 5. Find duplicated work across jobs and Taskfile lanes, including normal plus race tests, repeated vulnerability scans, repeated checkout/toolchain/private-module setup, and PR plus merged-push reruns.
 6. Identify correctness constraints such as private dependencies, generated docs, cgo, platform-specific files, release signing, secret scanning, and direct pushes to the default branch.
-7. For RAS repositories, identify certifying workflows that start automatically on `pull_request` or `pull_request_target`, confirm whether an explicit dispatch path can produce the required check on a PR head, and compare superseded RAS-reviewed heads with CI runs when evidence is available.
+7. For RAS repositories, distinguish default pull-request activity such as open and synchronize from operator-only activity filters such as `types: [labeled]`, confirm whether an explicit dispatch or one-shot event path can produce the required check in the PR rollup, and compare superseded RAS-reviewed heads with CI runs when evidence is available.
 
 When user direction establishes that the repository uses RAS but the audit cannot discover repository-local evidence, run it as `CI_USES_RAS=true scripts/audit-ci.sh <repository-path>`. Use `CI_USES_RAS=false` only when the repository is explicitly non-RAS and mechanical detection is a false positive.
 
@@ -61,6 +61,8 @@ Produce a migration that includes:
 
 For a repository that uses RAS as the review gate, prefer the minimal cost-first migration unless repository evidence requires more automation: stop automatic certifying CI on PR updates, retain or add explicit dispatch with a fail-closed binding to the exact RAS-reviewed SHA, keep the required check name stable, and let its absence on a new head block merging until RAS is clear and certification is dispatched for that head. A branch-only dispatch is insufficient because the branch can advance between review and workflow start. Treat Task wrappers, labels, webhooks, and custom statuses as optional refinements rather than prerequisites.
 
+When live proof shows that GitHub excludes `workflow_dispatch` checks from the required PR rollup, an operator-only `pull_request` activity such as `types: [labeled]` is an admissible fallback. Require a dedicated label, revoke it before running repository code, bind the event to the live same-repository PR head, base, and synthetic merge SHAs, fail closed on unrelated labels, and prove that open and synchronize events start no run.
+
 ## Apply
 
 Proceed only when the user explicitly asks to implement or has approved the plan.
@@ -75,7 +77,7 @@ Proceed only when the user explicitly asks to implement or has approved the plan
 5. Preserve or deliberately transition required check names. Do not change rulesets, branch protection, Actions budgets, secrets, variables, runner groups, or repository settings without explicit authorization for those external mutations.
 6. Pin third-party actions according to repository policy. Do not copy stale versions from the assets.
 7. Keep the diff scoped to CI standardization.
-8. For an approved RAS-first migration, remove `pull_request` and `pull_request_target` only from the certifying workflow, remove newly unreachable event branches, preserve an explicit full/fail-closed dispatch path, and add a workflow contract that prevents automatic PR certification from returning. Keep any automatic cheap preflight separate from the required certification check.
+8. For an approved RAS-first migration, remove automatic open and synchronize certification from `pull_request` and `pull_request_target`, remove newly unreachable event branches, preserve an explicit full/fail-closed operator path, and add a workflow contract that prevents automatic PR certification from returning. Prefer exact-head dispatch; use a one-shot label-only PR event only after live evidence shows dispatch cannot satisfy the required PR rollup. Keep any automatic cheap preflight separate from the required certification check.
 9. Do not open the migration PR without considering the bootstrap effect: the old default-branch workflow may start one final automatic CI run. Opening, cancelling, rerunning, or dispatching that run requires the user's authorization.
 
 ## Validate
@@ -89,7 +91,7 @@ Validate in proportion to the change:
 5. Re-run `scripts/audit-ci.sh` and resolve new policy warnings or document justified exceptions.
 6. Model at least these paths: docs-only PR, source PR, dependency change, workflow change, superseding PR commit, protected merge to the default branch, schedule, manual dispatch, and release tag when applicable.
 7. If authorized to open a test PR, observe actual check names and skipped-job behavior before changing required checks.
-8. For RAS-first certification, prove that PR open/synchronize events start no certifying jobs, a RAS-blocked head consumes no certifying runner time, dispatch produces the required check on the reviewed SHA, a newer SHA cannot reuse that success, and the required check remains absent or pending before dispatch.
+8. For RAS-first certification, prove that PR open/synchronize events start no certifying jobs, a RAS-blocked head consumes no certifying runner time, the operator trigger produces the required check in the PR rollup for the exact reviewed head/base/merge binding, a newer SHA cannot reuse that success, and the required check remains absent or pending before the operator trigger.
 
 Do not claim that a workflow saves minutes merely because YAML parses. Explain which jobs no longer start and under which events.
 
@@ -101,6 +103,6 @@ State:
 - files or settings changed, if any;
 - validation performed and unavailable validation;
 - expected runner-minute effect;
-- the exact RAS-to-dispatch operator command or handoff;
+- the exact RAS-to-certification operator command or handoff;
 - required human or GitHub-settings follow-up;
 - remaining policy exceptions.

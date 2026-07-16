@@ -20,10 +20,10 @@ Answer these before implementation:
 Use this pattern when RAS must settle before paid certification and the user has not requested a more elaborate integration:
 
 1. Preserve the stable required check and its result aggregation.
-2. Remove `pull_request` and `pull_request_target` from the certifying workflow; remove event-specific branches that become unreachable.
-3. Preserve or add `workflow_dispatch` with a full or otherwise fail-closed certification mode. Bind dispatch to the RAS-reviewed SHA with an expected-SHA input and an early equality check when practical; otherwise verify the resulting run's head SHA before accepting it.
+2. Remove automatic open and synchronize certification from `pull_request` and `pull_request_target`; remove event-specific branches that become unreachable.
+3. Preserve or add `workflow_dispatch` with a full or otherwise fail-closed certification mode. Bind dispatch to the RAS-reviewed SHA with an expected-SHA input and an early equality check when practical; otherwise verify the resulting run's head SHA before accepting it. If live proof shows that dispatch checks do not satisfy the required PR rollup, use a one-shot operator-only PR activity as the fallback and bind its event to the live same-repository head, base, and synthetic merge SHAs.
 4. Keep automatic PR preflight separate and non-required if repository evidence justifies it. Do not let skipped certification jobs report success before RAS.
-5. After a blocker-free RAS synthesis, dispatch certification on the same-repository PR branch. A new push invalidates both the RAS decision and required check because both belong to the old SHA.
+5. After a blocker-free RAS synthesis, invoke the proven operator trigger for the same-repository PR. A new push invalidates both the RAS decision and required check because both belong to the old SHA.
 6. Keep complete default-branch validation until rulesets prohibit direct pushes; then consider reducing the post-merge run separately.
 
 Adapt this operator handoff to the repository's workflow and inputs:
@@ -34,9 +34,17 @@ gh workflow run <certifying-workflow> --ref <same-repository-pr-branch> -f expec
 
 After dispatch, inspect the run and check suite rather than assuming the branch reference stayed unchanged.
 
+When dispatch cannot satisfy the required PR rollup, adapt this one-shot label handoff instead:
+
+```sh
+gh pr edit <pr-number> --repo <owner/repository> --add-label <certification-label>
+```
+
+The label workflow must subscribe only to the `labeled` PR activity, reject unrelated labels, remove the certification label before checkout, and re-read the live PR to bind its head, base, repositories, and synthetic merge SHA to the event. Prove on live source and documentation PRs that open and synchronize start no run, the label is revoked, and the stable required check appears in the PR rollup.
+
 Task is an optional operator interface, not the gate itself. A target such as `task certify-pr PR=<n>` may capture the head, run RAS, inspect structured synthesis, recheck the live head, and dispatch CI, but must not chain CI merely because `ras review` exited zero.
 
-Do not add labels, webhooks, repository-dispatch integrations, or custom status publishers unless the user wants automatic coordination or repository evidence requires enforcement beyond the required check.
+Do not add labels, webhooks, repository-dispatch integrations, or custom status publishers unless the user wants operator coordination or repository evidence requires enforcement beyond the required check. A persistent label is insufficient unless automation revokes it or otherwise SHA-binds it.
 
 ## Bootstrap
 

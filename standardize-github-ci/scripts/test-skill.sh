@@ -81,7 +81,7 @@ git -C "$repo" add .
 git -C "$repo" commit -qm initial
 
 ras_without_dispatch="$(cd "$repo" && CI_USES_RAS=true "$audit")"
-printf '%s\n' "$ras_without_dispatch" | rg -q 'RAS-BLOCKER repository: no workflow_dispatch path exists for post-RAS certification'
+printf '%s\n' "$ras_without_dispatch" | rg -q 'RAS-BLOCKER repository: no operator-triggered exact-head certification path was detected'
 
 cat > "$repo/.github/workflows/manual.yml" <<'YAML'
 name: Manual certification
@@ -98,7 +98,7 @@ YAML
 git -C "$repo" add .github/workflows/manual.yml
 git -C "$repo" commit -qm manual-unbound
 ras_without_binding="$(cd "$repo" && CI_USES_RAS=true "$audit")"
-printf '%s\n' "$ras_without_binding" | rg -q 'RAS-BLOCKER repository: manual dispatch exists but no exact-head SHA binding evidence was detected'
+printf '%s\n' "$ras_without_binding" | rg -q 'RAS-BLOCKER repository: operator-triggered certification exists but no exact-head binding evidence was detected'
 
 cat > "$repo/.github/workflows/manual.yml" <<'YAML'
 name: Manual certification
@@ -123,6 +123,67 @@ YAML
 git -C "$repo" add .github/workflows/manual.yml
 git -C "$repo" commit -qm manual-bound
 initial="$(git -C "$repo" rev-parse HEAD)"
+
+label_repo="$tmp/label-repo"
+mkdir -p "$label_repo/.github/workflows"
+git -C "$label_repo" init -q
+git -C "$label_repo" config user.email ci-skill-test@example.invalid
+git -C "$label_repo" config user.name ci-skill-test
+cat > "$label_repo/.github/workflows/certify.yml" <<'YAML'
+name: Label certification
+on:
+  pull_request:
+    types: [labeled]
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          TRIGGER_LABEL: ${{ github.event.label.name }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          MERGE_SHA: ${{ github.sha }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPOSITORY: ${{ github.event.pull_request.base.repo.full_name }}
+        run: |
+          test "$TRIGGER_LABEL" = ci:certify
+          gh api --method DELETE "repos/example/repo/issues/1/labels/$TRIGGER_LABEL"
+          pr_json='{"merge_commit_sha":"0000000000000000000000000000000000000000"}'
+          test "$(jq -r .merge_commit_sha <<< "$pr_json")" = "$MERGE_SHA"
+          test -n "$HEAD_SHA$BASE_SHA$HEAD_REPOSITORY$BASE_REPOSITORY"
+YAML
+git -C "$label_repo" add .
+git -C "$label_repo" commit -qm label-bound
+
+label_audit_output="$(cd "$label_repo" && CI_USES_RAS=true "$audit")"
+printf '%s\n' "$label_audit_output" | rg -Fq 'Pull request activity: `label-only operator trigger`'
+printf '%s\n' "$label_audit_output" | rg -Fq 'Label-gated certification binding: `detected; verify label revocation and head/base/merge comparisons fail closed`'
+printf '%s\n' "$label_audit_output" | rg -q 'Automatic pull-request workflows: `0`'
+printf '%s\n' "$label_audit_output" | rg -q 'Label-gated certification candidates: `1`'
+if printf '%s\n' "$label_audit_output" | rg -q 'RAS-(COST|BLOCKER)'; then
+  printf 'error: exact-bound label certification unexpectedly emitted a RAS signal\n' >&2
+  exit 1
+fi
+
+cat > "$label_repo/.github/workflows/certify.yml" <<'YAML'
+name: Incomplete label certification
+on:
+  pull_request:
+    types: [labeled]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: 'true'
+YAML
+label_incomplete_output="$(cd "$label_repo" && CI_USES_RAS=true "$audit")"
+printf '%s\n' "$label_incomplete_output" | rg -q 'RAS-BLOCKER .github/workflows/certify.yml: label-only certification lacks one-shot revocation or exact head/base/merge binding evidence'
+printf '%s\n' "$label_incomplete_output" | rg -q 'RAS-BLOCKER repository: no operator-triggered exact-head certification path was detected'
 
 printf '# documentation\n' >> "$repo/docs/README.md"
 git -C "$repo" add docs/README.md
