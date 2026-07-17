@@ -20,9 +20,11 @@ Produce an implementation plan, get the user's approval, then drive it to merge 
 
 1. Implement the PR's work — use the `tdd` skill where appropriate — then push and open the PR.
 2. Run the **review loop** below until a fresh review surfaces no blocking findings.
-3. Merge (squash). If GitHub reports `mergeable: UNKNOWN` right after a push, poll until `MERGEABLE` before merging.
-4. Append a dev-journal entry with the `append-dev-journal` skill — **do NOT run `ras` for the journal**.
-5. Update OmniFocus with the `omnifocus-cli` skill — complete the relevant task and add any follow-up issues created during review.
+3. Run the repository's final local certification once the review-clean candidate is pushed. If it exposes `task preflight`, run it and retain its exact head/base receipt; otherwise run and record the repository's documented local equivalents against the exact SHA. Run slice-specific stress gates separately when the plan names them. Any later candidate change invalidates this receipt and returns the PR to review before a new certification, except the explicitly exempted docs-only polish above: run its lightweight docs checks and generate a new local certification without another RAS review.
+4. Request the required hosted CI for that same head, verify the run head and live PR head still match, and confirm the required result before merge. Do not blindly rerun a failed unchanged head: diagnose it first; fix repository failures and return to review, and allow a same-head rerun only for a demonstrated external infrastructure failure.
+5. Merge (squash) that exact head. If `main` advances, update the branch and repeat review, local certification, and CI. If GitHub reports `mergeable: UNKNOWN` right after a push, poll until `MERGEABLE` before merging.
+6. Append a dev-journal entry with the `append-dev-journal` skill — **do NOT run `ras` for the journal**.
+7. Update OmniFocus with the `omnifocus-cli` skill — complete the relevant task and add any follow-up issues created during review.
 
 ### The review loop
 
