@@ -52,7 +52,7 @@ This step is complete when the intended PR implements every acceptance criterion
 
 ## 4. Review, certify, and merge
 
-Follow `docs/REVIEW-LOOP.md` exactly. Judge and fix findings yourself; use RAS only as that protocol permits. When a blocking finding shows the approach is wrong, stop with evidence and ask the user to invoke `$architecture-handoff` for re-audit.
+Follow `docs/REVIEW-LOOP.md` exactly. Judge and fix findings yourself; use RAS only as that protocol permits. Before fixing blockers from each fresh review, compare them with all prior fresh reviews and verified fixes for this PR. Treat a blocker outside the pinned slice as an immediate approach-level finding. Also stop when a later fresh blocker is rooted in the same accepted ownership, authority, seam, ordering, schema, or failure-model assumption as a previously verified fix, or when the review sequence collectively widens the slice, blast radius, or transitional-seam budget. Preserve the branch, report the review/verification run IDs and causal pattern, run no further RAS cycle, and ask the user to invoke `$architecture-handoff` for re-audit.
 
 After a fresh review is clean, push the final candidate, run every named stress gate, and run the repository's exact-head local certification. Dispatch hosted CI only for that certified head, verify the live PR head and required result still match, and merge that exact head. Diagnose failed CI before deciding whether any rerun is legitimate. If the base advances, repeat every gate required by the repository protocol.
 

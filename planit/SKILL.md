@@ -34,12 +34,19 @@ Before planning, inspect any supplied issue. When given an OmniFocus task, use `
 
 Low/nit handling is a loop-control policy, not just a prioritization hint. If low/nit findings appear alongside blocking findings, fix cheap and local low/nit items only while another verify/review cycle is already required for blockers. If the only remaining findings are low/nit and any are not docs-only, do not fix them now, even if they look cheap; file follow-up issues and stop the loop. If the only remaining findings are low/nit docs-only findings, fix them only when the edit is cheap and correctness is very high confidence; after that docs-only polish fix, do not run another `ras review`, `ras verify`, or full RAS loop solely for the docs change.
 
+Approach-stop policy: before fixing blockers from a fresh review, compare its synthesis with every prior fresh review and verified fix for the PR. Treat any blocker that requires work beyond the approved PR boundary, acceptance criteria, or declared blast radius as an immediate approach-level finding. Also stop when a later fresh blocker is rooted in the same ownership, authority, seam, ordering, schema, or failure-model assumption as a previously verified fix, or when the sequence of otherwise-local blockers collectively requires widening the approved boundary. Preserve the branch, record the review/verification run IDs and causal pattern, run no further fix/verify/review cycle, and present a revised approach for user approval. Failed verification of the current fix remains inner-loop evidence and does not by itself establish a repeated fresh-review pattern.
+
 ```
 outer review loop:
   ras review <pr>
   if the review has no blocking findings:
     apply the low/nit policy above
     done
+
+  compare the blocking synthesis with all prior fresh reviews and verified fixes
+  if any blocker crosses the approved PR boundary, or the review history shows
+    a repeated root assumption or collective boundary expansion:
+      STOP, preserve the branch, report the review history, and check with the user
 
   inner fix loop:
     for each blocking synthesis item, first judge: is this a local fix, or a

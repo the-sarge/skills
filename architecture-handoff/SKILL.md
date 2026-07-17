@@ -30,7 +30,7 @@ Draft one implementation-plan doc per track in `docs/adr/` using [TEMPLATES.md](
 
 Also draft or update the program-overview doc and record any new domain terms or ADRs through the domain-modeling skill.
 
-Every plan's Operating Discipline section references `docs/REVIEW-LOOP.md`. If the repo lacks it, seed it from the bundled [REVIEW-LOOP.md](REVIEW-LOOP.md). If it exists, verify it covers the manual review/fix/verify loop, exact-head local certification, same-head hosted CI, merge, journal, OmniFocus, and diagnosis before reruns; update stale protocol text with the implementation-plan docs.
+Every plan's Operating Discipline section references `docs/REVIEW-LOOP.md`. If the repo lacks it, seed it from the bundled [REVIEW-LOOP.md](REVIEW-LOOP.md). If it exists, verify it covers the manual review/fix/verify loop, history-aware approach stops, exact-head local certification, same-head hosted CI, merge, journal, OmniFocus, and diagnosis before reruns; update stale protocol text with the implementation-plan docs.
 
 ## Step 2 — Design and audit tracer-bullet slices
 

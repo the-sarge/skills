@@ -27,12 +27,19 @@ Low/nit policy:
 - If the only remaining findings are low/nit and any are not docs-only, leave them out of the current PR, file follow-up issues, report them separately, and treat the review loop as clean for merge-readiness.
 - If the only remaining findings are low/nit docs-only findings, fix them only when cheap and supported by very high confidence. After such a docs-only polish fix, skip another RAS review/verify cycle, run lightweight local docs checks plus a new local certification, and report that the RAS rerun was skipped by policy.
 
+Approach-stop policy: before fixing blockers from a fresh review, compare its synthesis with every prior fresh review and verified fix for the PR. Treat any blocker that requires work beyond the approved PR/slice boundary, acceptance criteria, or declared blast radius as an immediate approach-level finding. Also stop when a later fresh blocker is rooted in the same ownership, authority, seam, ordering, schema, or failure-model assumption as a previously verified fix, or when the sequence of otherwise-local blockers collectively requires widening the approved boundary. Preserve the branch, record the review/verification run IDs and causal pattern, run no further fix/verify/review cycle, and check with the operator. Failed verification of the current fix remains inner-loop evidence and does not by itself establish a repeated fresh-review pattern.
+
 ```text
 outer review loop:
   ras review <pr>
   if the review has no blocking findings:
     apply the low/nit policy above
     done
+
+  compare the blocking synthesis with all prior fresh reviews and verified fixes
+  if any blocker crosses the approved PR/slice boundary, or the review history
+    shows a repeated root assumption or collective boundary expansion:
+      STOP, preserve the branch, report the review history, and check with the operator
 
   inner fix loop:
     for each blocking synthesis item, first judge whether it is a local fix
