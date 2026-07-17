@@ -1,8 +1,6 @@
 # Templates
 
-Exemplars from the first run (SwarmCast repo, 2026-07-05):
-`docs/adr/2026-07-05-architecture-deepening-program.md`, the five
-`2026-07-05-*-plan.md` docs beside it, and issues #211–#216.
+Use these shapes after the slice graph passes the agent's evidence audit. Keep plan docs evidence-rich; keep issues concise and link back to the plan.
 
 ## Implementation-plan doc skeleton
 
@@ -12,46 +10,69 @@ Exemplars from the first run (SwarmCast repo, 2026-07-05):
 **Date:** {YYYY-MM-DD}
 **Status:** Accepted; not yet implemented
 **Track:** {n} of {N} in the {date} architecture deepening program
-**Depends on:** {other track + which PR, or "nothing — safe to start first"}
-**Related:** {ADRs this track must honor, if any}
+**Depends on:** {track/slice, or "nothing — safe to start first"}
+**Related:** {settled ADRs and plans}
 
 ## Goal
 
-{One paragraph: the deepening in CONTEXT.md vocabulary — what module gets
-deep, what interface shrinks, what leverage/locality is gained.}
+{What module becomes deeper, where its interface seam lives, and what leverage/locality results.}
 
 ## Current Shape (verified {date})
 
-{Verified facts with file:line anchors. Include LOC where it matters.
-If grilling narrowed or corrected the original review finding, say so
-explicitly here — implementing agents must know the review claim that did
-NOT survive.}
+{Verified facts with file:line anchors. State which original review claims did not survive grilling.}
 
 ## Decision
 
-{The grilled design: interface shape, what moves vs stays, load-bearing
-rules from grilling. Mark reversed/rejected directions:
-"**Rejected alternative (do not do this):** ..." Non-goals last.}
+{Grilled interface, ownership, invariants, ordering, failure modes, and reasoning.}
+
+**Rejected alternative (do not do this):** {Likely wrong turn and why.}
+
+**Non-goals:** {Explicit exclusions.}
+
+## Slice Graph
+
+| Slice | Status/disposition | Delivers | Blocked by | Removes temporary seam |
+|---|---|---|---|---|
+| 1 | {new/retain/rework/replace/close} | {end-to-end behavior} | None | {seam or n/a} |
 
 ## Implementation Slices
 
-{Numbered PRs. Each: scope, TDD guidance (which tests to write/pin first),
-what proves behavior preservation. Note which PR unblocks dependent tracks.}
+### Slice 1 — {Title}
+
+**What it delivers:** {Narrow, complete behavior through the real seams.}
+
+**Existing-work disposition:** {For open PRs/branches: retain, rework, split, replace, or close, with unresolved-review and diff evidence. Otherwise "new slice."}
+
+**Blocked by:** {Audited slice identifiers, or none.}
+
+**Single owner after merge:** {Owner for every durable fact/transition touched.}
+
+**Authority completeness:** {Constructors, validation, restart round trip, and destructive/security-sensitive consumers covered for newly authoritative facts.}
+
+**Transitional-seam budget:** {Duplicate representations, generic mutations, adapters, or double opens retained; why coherent; exact removal slice. State "none" when none.}
+
+**Blast radius:** {Shared state, concurrency/ordering, interfaces/schema, failures, performance, security, dependencies. Explicitly flag untraced effects.}
+
+**TDD and preservation proof:** {Tests written first and gates proving preserved behavior.}
+
+**Fresh-context case:** {Why implementation, fixes, and verification fit one fresh context.}
+
+**Slice decision audit:** {Strongest further-split and adjacent-merge alternatives; why each was rejected; evidence that every blocking edge is necessary.}
+
+**Stop conditions:** {Code evidence that invalidates the approach and requires operator review.}
 
 ## Acceptance Criteria
 
-{Bullet list, checkable, including negative criteria ("grep for X returns
-nothing", "no bare literals remain").}
+- [ ] {Checkable behavioral outcome.}
+- [ ] {Negative criterion proving an old seam or authority is absent where promised.}
 
 ## Validation Gates
 
-{Exact commands: focused package tests, full suite, repo task runner.}
+{Exact focused tests, full suite, task runner, and platform/race gates.}
 
 ## Operating Discipline
 
-Follow `docs/REVIEW-LOOP.md` for every PR. {Track-specific stop conditions:
-"If X proves wrong, STOP and check with the operator — that is an
-approach-level finding." Vocabulary reminders.}
+Follow `docs/REVIEW-LOOP.md` for every slice/PR. {Track-specific approach stop conditions and vocabulary reminders.}
 ```
 
 ## Program-overview doc skeleton
@@ -62,40 +83,83 @@ approach-level finding." Vocabulary reminders.}
 **Status:** Accepted; tracks not yet implemented
 
 ## What this is
-{Origin: review + grilling. Point of the doc: program index; each track's
-plan doc carries full context so no agent re-derives decisions.}
+
+{Origin and why plan docs are the source of truth.}
 
 ## Outcomes that require no implementation
-{Candidates rejected/closed with their ADRs; guardrails adopted instead of
-refactors; vocabulary already committed.}
 
-## Tracks, in recommended order
-| # | Track | Plan doc | Depends on | Size |
-{...}
-{Which tracks are parallel-safe; which is the recommended starter.}
+{Rejected candidates, adopted guardrails, and settled ADRs.}
+
+## Tracks, dependencies, and frontier
+
+| # | Track | Plan | Parent issue | Blocked by | Slices | Status |
+|---|---|---|---|---|---|---|
+| 1 | {name} | {plan link} | {issue or pending} | None | {count} | FRONTIER |
+
+{Cross-track slice edges, parallel-safe work, and recommended starter.}
 
 ## Rules that bind every track
-{Behavior preservation gates; docs/REVIEW-LOOP.md; settled ADRs not to
-re-litigate; vocabulary discipline; post-merge ritual.}
+
+{Behavior preservation; single-owner and authority-complete invariants; transitional-seam budget; review loop; settled ADRs; vocabulary; post-merge ritual.}
 ```
 
-## Track issue body
+## Parent track issue body
 
 ```markdown
-Implement the plan in **`docs/adr/{date}-{track}-plan.md`** — the plan doc
-is the source of truth and contains the full grilled design. Do not
-re-derive design decisions; if a plan assumption proves wrong in code, stop
-and check with the operator.
+Implement only through the audited child slices in **`docs/adr/{date}-{track}-plan.md`**. The plan is the source of truth and contains the grilled design. Do not dispatch this parent issue as one implementation task. If a plan assumption proves wrong, stop and check with the operator.
 
-{If the plan records a reversed decision, restate it here: the naive
-reading an agent would reach, and why it was rejected.}
+**Summary:** {Track outcome.}
 
-**Summary:** {one paragraph}
+**Rejected direction:** {Restate the likely wrong turn, when applicable.}
 
-- Depends on: {issue #s + which PR, or "nothing"}
-- Size: {n} PRs
-- Process: follow `docs/REVIEW-LOOP.md` for every PR.
+- Depends on: {parent/child issues or none}
+- Size: {n} audited child slices/PRs
+- Process: `docs/REVIEW-LOOP.md` for every child PR
 - Program index: `docs/adr/{date}-architecture-deepening-program.md`
+
+## Audited slices
+
+- [ ] #{child} — {slice title} — blocked by {children or none}
+```
+
+## Child slice issue body
+
+```markdown
+<!-- architecture-handoff-slice:v1 -->
+
+**Dispatch:** `$implement-architecture-slice`
+**Plan commit:** `{exact 40-character docs commit SHA}`
+
+## Parent and source of truth
+
+- Parent: #{track issue}
+- Plan: `docs/adr/{date}-{track}-plan.md` — {slice heading}
+
+## What to build
+
+{The narrow end-to-end behavior this slice makes work. Do not restate a layer-by-layer recipe.}
+
+## Acceptance criteria
+
+- [ ] {Behavioral result.}
+- [ ] {Restart/failure/concurrency or negative criterion required by the slice.}
+- [ ] {Preservation gate.}
+
+## Ownership and transition budget
+
+- Single owner after merge: {owner}
+- Authority completeness: {constructors, validation, restart, and destructive/security consumers covered; or no new authoritative fact}
+- Temporary seams retained: {seams, why coherent, and removal issue; or none}
+- Blast radius: {traced effects and explicitly untraced effects}
+- Preservation proof: {gate for each contract intended to remain unchanged}
+
+## Blocked by
+
+- {Child issue links, or "None — can start immediately"}
+
+## Stop conditions
+
+{Evidence that invalidates the approach. Stop and consult the operator rather than widening the slice.}
 ```
 
 ## Tracking issue body
@@ -103,16 +167,17 @@ reading an agent would reach, and why it was rejected.}
 ```markdown
 Program index: **`docs/adr/{date}-architecture-deepening-program.md`**.
 
-Recommended order ({which} parallel-safe; {which} blocked):
+## Current frontier
 
-- [ ] #{n} Track 1 — {name} (starter)
-- [ ] #{n} Track 2 — {name} ⚠️ blocked by #{m} (PR {k})
-{...}
+- [ ] #{child} — {ready slice}
 
-Already closed with no code: {rejections + their ADRs}.
+## Tracks
 
-Binding rules for all tracks: behavioral preservation is the hard gate;
-`docs/REVIEW-LOOP.md` per PR; do not re-litigate {settled ADRs}.
+- [ ] #{parent} — {track} ({slice count} slices; {status/blocker})
+
+Already closed with no code: {rejections and ADRs}.
+
+Binding rules: behavioral preservation; one mutation owner per durable fact; authority-complete slices; explicit transitional-seam removal; `docs/REVIEW-LOOP.md` per PR.
 ```
 
 ## OmniFocus note shapes
@@ -120,16 +185,29 @@ Binding rules for all tracks: behavioral preservation is the hard gate;
 Track task note:
 
 ```text
-GitHub: {issue URL}
+GitHub parent: {URL}
 Plan: docs/adr/{date}-{track}-plan.md
-{One-line summary}. {Dependency warning or "Independent."} {n} PRs.
+{Summary}. {Dependency warning or "Independent."} {n} audited slices.
 ```
 
-Parent task note:
+Slice task note:
+
+```text
+GitHub child: {URL}
+Parent: {URL}
+Dispatch: $implement-architecture-slice
+Plan commit: {exact 40-character docs commit SHA}
+Plan: docs/adr/{date}-{track}-plan.md#{slice-anchor}
+Delivers: {end-to-end outcome}
+Blocked by: {issues or none}
+Per slice: review loop, merge, append-dev-journal, complete this task.
+```
+
+Program-parent note:
 
 ```text
 Program index: docs/adr/{date}-architecture-deepening-program.md
 Tracking issue: {URL}
-{Parallel/blocked summary}. Per PR: review loop per docs/REVIEW-LOOP.md,
-merge, append-dev-journal, complete OmniFocus task.
+Current frontier: {child issues}
+Dispatch each frontier child to a fresh agent with $implement-architecture-slice.
 ```

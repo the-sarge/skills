@@ -1,11 +1,13 @@
 ---
 name: planit
-description: Produce an implementation plan and drive it to merge through a controlled, agent-in-the-loop review cycle. Use when the user asks to make an implementation plan, plan a feature or change, or plan work to implement. Produces a branch-based, multi-PR (when needed), TDD-where-appropriate plan; requires the user's approval before any code; and runs each PR through a manual `ras review`/`ras verify` loop (the agent does the fixing — never the auto-fixer) before merge, dev-journal, and OmniFocus updates.
+description: Produce an implementation plan for standalone or unplanned work and drive it to merge through a controlled, agent-in-the-loop review cycle. Use when the user asks to plan a feature or change that has not already been packaged as an architecture-handoff child slice. Route marked architecture-handoff child issues and their mirrored OmniFocus tasks to implement-architecture-slice.
 ---
 
 # planit
 
 Produce an implementation plan, get the user's approval, then drive it to merge one PR at a time through a review loop where **you** do the fixing and judging and RAS is used **only** to review and verify.
+
+Before planning, inspect any supplied issue. When given an OmniFocus task, use `omnifocus-cli` to resolve and inspect its linked issue. When the issue contains `<!-- architecture-handoff-slice:v1 -->`, invoke `$implement-architecture-slice`; its committed plan is already the approved design and its execution preflight replaces this planning stage.
 
 ## Workflow
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Implement Architecture Slice"
+  short_description: "Execute one audited architecture slice"
+  default_prompt: "Use $implement-architecture-slice to execute this audited architecture-handoff child issue through merge."

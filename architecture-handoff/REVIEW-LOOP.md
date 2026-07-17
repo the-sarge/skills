@@ -1,48 +1,33 @@
 # Review Loop Protocol
 
-The standard per-PR discipline for agent-implemented work in this repo.
-Implementation plan docs reference this file from their Operating Discipline
-sections; do not restate it inline.
+The standard per-PR discipline for agent-implemented work in this repo. Implementation plan docs reference this file from their Operating Discipline sections; do not restate it inline.
 
 ## Structure
 
-- Do the work in a branch, divided into multiple PRs if needed, using TDD
-  where appropriate.
+- Do the work in a branch, divided into multiple PRs if needed, using TDD where appropriate.
 
 ## For each PR
 
-1. Run the review loop below until a fresh review surfaces no blocking
-   findings.
-2. Merge.
-3. append-dev-journal (do NOT run `ras` for the journal).
-4. Update OmniFocus — complete the relevant task and add any follow-up issues
-   created during review.
+1. Run the review loop below until a fresh review surfaces no blocking findings.
+2. Push the final candidate, run slice-specific stress checks, and run the repository's local exact-head certification.
+3. Request required hosted CI for that same head and verify its protected result belongs to the certified head.
+4. Merge that exact head.
+5. Run `append-dev-journal` without RAS.
+6. Update OmniFocus: complete the relevant task and add review follow-ups.
 
-## The review loop
+## Review loop
 
-YOU (the implementing agent) do all the fixing and judging; RAS is used ONLY
-to review and verify. Never hand fixing to an auto-fixer. Do NOT use
-`ras review-fix` or `ras review-loop`.
+The implementing agent does all fixing and judging; RAS is used only to review and verify. Never hand fixing to an auto-fixer. Do not use `ras review-fix` or `ras review-loop`.
 
-"Clean" below means NO remaining BLOCKING findings. Low/nit handling is a
-loop-control policy, not just a prioritization hint.
+“Clean” means no remaining blocking findings. Low/nit handling is a loop-control policy, not merely a prioritization hint.
 
 Low/nit policy:
 
-- If low/nit findings appear ALONGSIDE blocking findings, you may fix cheap,
-  local low/nit items while already editing, because another verify/review
-  cycle is already required for blockers.
-- If the ONLY remaining findings are low/nit and any are not docs-only, DO
-  NOT FIX THEM NOW, even if they look cheap. File follow-up issues, report
-  them separately, and treat the review loop as clean for merge-readiness.
-- If the ONLY remaining findings are low/nit docs-only findings, you may fix
-  them only when they are cheap and you have very high confidence in
-  correctness. After such a docs-only polish fix, DO NOT run another
-  `ras review`, `ras verify`, or full RAS loop solely for that docs change.
-  Run only lightweight local docs checks, then explicitly report that the RAS
-  re-run was skipped by policy.
+- If low/nit findings appear alongside blocking findings, cheap and local low/nit items may be fixed while already editing because another verify/review cycle is required for blockers.
+- If the only remaining findings are low/nit and any are not docs-only, leave them out of the current PR, file follow-up issues, report them separately, and treat the review loop as clean for merge-readiness.
+- If the only remaining findings are low/nit docs-only findings, fix them only when cheap and supported by very high confidence. After such a docs-only polish fix, skip another RAS review/verify cycle, run lightweight local docs checks plus a new local certification, and report that the RAS rerun was skipped by policy.
 
-```
+```text
 outer review loop:
   ras review <pr>
   if the review has no blocking findings:
@@ -50,21 +35,26 @@ outer review loop:
     done
 
   inner fix loop:
-    for each blocking synthesis item, first judge: is this a local fix, or a
-    sign the APPROACH itself is wrong? If approach-wrong, STOP, reconsider
-    the design, and check with the operator. Do not patch around it.
+    for each blocking synthesis item, first judge whether it is a local fix
+      or evidence that the approach is wrong
+    if approach-wrong: STOP, reconsider the design, and check with the operator
     fix the blocking items
-    if cheap local low/nit findings are in the same area, you may fix them
-    now because blockers already require another verify/review cycle
+    optionally fix cheap local low/nit findings in the same area
     run the required tests
     push the branch update
-    ras verify <review-run-id> --head <exact 40-char SHA you just pushed>
-    if verification confirms the blocking items are resolved: return to the
-    outer loop for a FRESH ras review, to catch any NEW blocking issues the
-    fixes introduced
-    else: stay in the inner fix loop, fixing using BOTH the review and the
-    verification feedback
+    ras verify <review-run-id> --head <exact 40-character SHA just pushed>
+    if verification confirms the blockers are resolved:
+      return to the outer loop for a fresh review
+    else:
+      remain in the inner loop using review and verification feedback
 ```
 
-Repeat until a fresh `ras review` surfaces no blocking findings after
-applying the low/nit policy.
+Repeat until a fresh `ras review` surfaces no blocking findings after applying the low/nit policy.
+
+## Exact-head local certification and hosted CI
+
+After the review loop is clean, run every slice-specific stress command, push the final candidate, and verify the worktree is clean. If the repository exposes `task preflight`, run it and retain its exact head/base receipt; otherwise run and record the repository's documented local equivalents against the exact pushed SHA. Any candidate change invalidates that receipt and returns the PR to review before recertification, except for the docs-only polish policy above.
+
+Request hosted CI only when local certification passes, its head is still the live PR head, and its base is still the live default-branch tip. Verify the hosted run head, live PR head, and protected result before merging the exact certified head. Hosted CI remains authoritative for clean-runner, operating-system, architecture, secret, and service boundaries that local execution cannot reproduce.
+
+Diagnose failed CI before deciding what happens next. Product tests, static analysis, races, nondeterministic repository tests, and reproducible tool failures return the PR to implementation, review, and recertification. A same-head rerun is allowed only for a demonstrated external infrastructure failure. If the default branch advances, update the branch and repeat every review, certification, and CI gate required by the repository.
