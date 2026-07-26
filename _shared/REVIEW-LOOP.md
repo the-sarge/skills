@@ -1,6 +1,6 @@
 # Review Loop Protocol
 
-The standard per-PR discipline for agent-implemented work in this repo. Implementation plan docs reference this file from their Operating Discipline sections; do not restate it inline.
+This shared baseline owns finding-family classification, precise-root history checks, low/nit handling, and the manual review/fix/verify loop. Repositories may add stronger boundary, certification, CI, merge, journal, and tracking rules; those additions compose with this baseline rather than redefining a precise root by broad topic alone.
 
 ## Structure
 
@@ -25,9 +25,11 @@ Low/nit policy:
 
 - If low/nit findings appear alongside blocking findings, cheap and local low/nit items may be fixed while already editing because another verify/review cycle is required for blockers.
 - If the only remaining findings are low/nit and any are not docs-only, leave them out of the current PR, file follow-up issues, report them separately, and treat the review loop as clean for merge-readiness.
-- If the only remaining findings are low/nit docs-only findings, fix them only when cheap and supported by very high confidence. After such a docs-only polish fix, skip another RAS review/verify cycle, run lightweight local docs checks plus a new local certification, and report that the RAS rerun was skipped by policy.
+- If the only remaining findings are low/nit docs-only findings, fix them only when cheap and supported by very high confidence. After such a docs-only polish fix, skip another RAS review/verify cycle, run lightweight local docs checks plus a new local certification, and report that the RAS rerun was skipped by policy. When the polish is not both cheap and high-confidence, leave it out, file a follow-up, report it separately, and treat the loop as clean.
 
-Approach-stop policy: before fixing blockers from a fresh review, compare its synthesis with every prior fresh review and verified fix for the PR. Treat any blocker that requires work beyond the approved PR/slice boundary, acceptance criteria, or declared blast radius as an immediate approach-level finding. Also stop when a later fresh blocker is rooted in the same ownership, authority, seam, ordering, schema, or failure-model assumption as a previously verified fix, or when the sequence of otherwise-local blockers collectively requires widening the approved boundary. Preserve the branch, record the review/verification run IDs and causal pattern, run no further fix/verify/review cycle, and check with the operator. Failed verification of the current fix remains inner-loop evidence and does not by itself establish a repeated fresh-review pattern.
+Finding-family policy: before editing for a blocking finding, translate it through `observed example → violated invariant → sibling family → enforcement owner → regression matrix`. When the finding crosses a protocol, lifecycle, multi-entrypoint, authority, environment, restoration, restart, concurrency, or security-sensitive boundary, apply the [contract-closure protocol](CONTRACT-CLOSURE.md). A fix is local only when the complete sibling family fits the approved boundary and one central owner can enforce it. Fix and prove that family rather than only the reported example.
+
+Approach-stop policy: before fixing blockers from a fresh review, compare their precise invariants and enforcement owners with every prior fresh review and verified fix for the PR. Treat any blocker that requires work beyond the approved PR/slice boundary, acceptance criteria, or declared blast radius as an immediate approach-level finding. Also stop when a later fresh blocker repeats a previously verified invariant-and-owner root, or when the sequence of otherwise-local blockers collectively requires widening the approved boundary. Preserve the branch, record the review/verification run IDs and causal pattern, and run no further fix/verify/review cycle. Return control to the invoking skill's approach-stop branch; if none exists, check with the operator. Failed verification of the current fix remains inner-loop evidence and does not by itself establish a repeated fresh-review pattern.
 
 ```text
 outer review loop:
@@ -36,16 +38,19 @@ outer review loop:
     apply the low/nit policy above
     done
 
+  derive the precise invariant, sibling family, and enforcement owner
+  apply contract closure when a risk trigger is present
   compare the blocking synthesis with all prior fresh reviews and verified fixes
   if any blocker crosses the approved PR/slice boundary, or the review history
-    shows a repeated root assumption or collective boundary expansion:
-      STOP, preserve the branch, report the review history, and check with the operator
+    shows a repeated invariant-and-owner root or collective boundary expansion:
+      STOP, preserve the branch, report the review history, and return to the
+        invoking skill's approach-stop branch
 
   inner fix loop:
     for each blocking synthesis item, first judge whether it is a local fix
       or evidence that the approach is wrong
-    if approach-wrong: STOP, reconsider the design, and check with the operator
-    fix the blocking items
+    if approach-wrong: STOP and return to the invoking skill's approach-stop branch
+    fix the complete in-bound sibling family at its enforcement owner
     optionally fix cheap local low/nit findings in the same area
     run the required tests
     push the branch update

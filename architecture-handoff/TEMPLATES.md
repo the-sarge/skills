@@ -53,6 +53,8 @@ Use these shapes after the slice graph passes the agent's evidence audit. Keep p
 
 **Blast radius:** {Shared state, concurrency/ordering, interfaces/schema, failures, performance, security, dependencies. Explicitly flag untraced effects.}
 
+**Contract closure:** {For triggered protocol, lifecycle, multi-entrypoint, authority, environment, restoration, restart, concurrency, or security boundaries: invariant, enforcement owner, behaviorally distinct equivalence classes, dispositions, and proofs. Otherwise "not triggered" with evidence.}
+
 **TDD and preservation proof:** {Tests written first and gates proving preserved behavior.}
 
 **Fresh-context case:** {Why implementation, fixes, and verification fit one fresh context.}
@@ -72,7 +74,7 @@ Use these shapes after the slice graph passes the agent's evidence audit. Keep p
 
 ## Operating Discipline
 
-Follow `docs/REVIEW-LOOP.md` for every slice/PR. {Track-specific approach stop conditions and vocabulary reminders.}
+Follow `docs/REVIEW-LOOP.md` and `docs/CONTRACT-CLOSURE.md` for every slice/PR. {Track-specific approach stop conditions and vocabulary reminders.}
 ```
 
 ## Program-overview doc skeleton
@@ -106,7 +108,7 @@ Follow `docs/REVIEW-LOOP.md` for every slice/PR. {Track-specific approach stop c
 ## Parent track issue body
 
 ```markdown
-Implement only through the audited child slices in **`docs/adr/{date}-{track}-plan.md`**. The plan is the source of truth and contains the grilled design. Do not dispatch this parent issue as one implementation task. If a plan assumption proves wrong, stop and check with the operator.
+Implement only through the audited child slices in **`docs/adr/{date}-{track}-plan.md`**. The plan is the source of truth and contains the grilled design. Do not dispatch this parent issue as one implementation task. If a plan assumption proves wrong, use the child skill's scoped re-audit; check with the operator only when closure changes the accepted boundary.
 
 **Summary:** {Track outcome.}
 
@@ -151,6 +153,7 @@ Implement only through the audited child slices in **`docs/adr/{date}-{track}-pl
 - Authority completeness: {constructors, validation, restart, and destructive/security consumers covered; or no new authoritative fact}
 - Temporary seams retained: {seams, why coherent, and removal issue; or none}
 - Blast radius: {traced effects and explicitly untraced effects}
+- Contract closure: {matrix location and precise invariant/enforcement owner, or not triggered with evidence}
 - Preservation proof: {gate for each contract intended to remain unchanged}
 
 ## Blocked by
@@ -159,7 +162,7 @@ Implement only through the audited child slices in **`docs/adr/{date}-{track}-pl
 
 ## Stop conditions
 
-{Evidence that invalidates the approach. Stop and consult the operator rather than widening the slice.}
+{Evidence that invalidates the approach. Enter the scoped re-audit without widening the slice; consult the operator when closure changes topology, adjacent scope, product intent, irreversible authority, or the one-PR boundary.}
 ```
 
 ## Tracking issue body
@@ -177,7 +180,7 @@ Program index: **`docs/adr/{date}-architecture-deepening-program.md`**.
 
 Already closed with no code: {rejections and ADRs}.
 
-Binding rules: behavioral preservation; one mutation owner per durable fact; authority-complete slices; explicit transitional-seam removal; `docs/REVIEW-LOOP.md` per PR.
+Binding rules: behavioral preservation; one mutation owner per durable fact; authority-complete slices; explicit transitional-seam removal; contract closure for triggered boundaries; `docs/REVIEW-LOOP.md` per PR.
 ```
 
 ## OmniFocus note shapes

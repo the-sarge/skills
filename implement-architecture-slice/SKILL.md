@@ -18,7 +18,7 @@ Require the child issue to contain all of the following:
 - A 40-character plan commit, plan path, and exact slice heading.
 - One end-to-end outcome, acceptance criteria, ownership and authority obligations, transition budget, blockers, preservation proof, and approach-level stop conditions.
 
-Read the repository instructions, child and parent issues, the plan at the recorded commit, the current default-branch version of that plan, the program index, referenced ADR/domain docs, and `docs/REVIEW-LOOP.md`. Stop if the review protocol is absent.
+Read the repository instructions, child and parent issues, the plan at the recorded commit, the current default-branch version of that plan, the program index, referenced ADR/domain docs, and `docs/REVIEW-LOOP.md`. Read `docs/CONTRACT-CLOSURE.md` when present, otherwise use the shared [contract-closure reference](../_shared/CONTRACT-CLOSURE.md). Stop if the review protocol is absent.
 
 Verify every blocker is closed, the issue is on the current implementation frontier, and the current plan still agrees materially with the recorded contract. If the plan changed after the recorded commit, inspect that diff; continue only when the slice contract is unchanged or the child issue was explicitly synchronized with the accepted revision.
 
@@ -34,17 +34,33 @@ Inspect the current code to confirm the plan's factual assumptions. Emit a short
 - The likely files and real seams involved.
 - The tests to make red first, plus preservation, restart, failure, concurrency, platform, and stress gates required by the slice.
 - The mutation owner, authority-completeness obligations, transitional-seam budget, traced blast radius, and explicitly untraced effects.
+- The contract-closure invariant, enforcement owner, matrix location, and uncovered cells for every triggered protocol, lifecycle, multi-entrypoint, authority, environment, restoration, restart, concurrency, or security-sensitive boundary.
 - The branch/worktree choice, existing-work precautions, and stop conditions.
 
 This preflight reports how the accepted slice will be executed; it does not reopen its design. Continue after reporting it. Wait for approval only when the user explicitly requested an approval gate.
 
-Stop with evidence and ask the user to invoke `$architecture-handoff` for re-audit when current code invalidates an accepted assumption, the issue and plan disagree, a blocker remains open, the work crosses an adjacent slice, ownership or authority must change, an untraced effect becomes material, or the work cannot fit one independently green PR. Preserve any useful branch state and recommend re-audit rather than expanding the slice locally.
+Enter the scoped re-audit branch below when current code invalidates an accepted assumption, the issue and plan disagree, ownership or authority must change within the accepted outcome, an untraced effect becomes material, or review reaches an approach stop. A remaining blocker, adjacent-slice crossing, product decision, irreversible external action, or inability to retain one independently green PR is not a scoped repair; preserve useful branch state and ask the user to invoke `$architecture-handoff`.
+
+## Scoped re-audit branch
+
+The original `$implement-architecture-slice` invocation authorizes routine scoped re-audits that retain the accepted child, end-to-end outcome, and one-PR boundary. Do not ask the user to invoke another skill merely to enter this branch.
+
+1. Preserve the implementation branch and stop code edits, RAS cycles, certification, and CI.
+2. Reconstruct the complete code and review evidence, including verified fixes. Apply the shared [contract-closure reference](../_shared/CONTRACT-CLOSURE.md) to every precise invariant-and-owner root involved.
+3. Re-run the slice gates: single owner, authority completeness, transitional seams, preservation, blast radius, context fit, and the strongest split/merge cases.
+4. Continue only when the same child and one-PR outcome pass those gates with a central enforcement design and a complete closure matrix. Add a durable re-audit section to the plan containing the closure matrix, disposition, trigger evidence, and review/verification IDs when they exist; update the program overview in a clean docs worktree from the live default branch. Publish those docs through the repository's authorized path and require the resulting commit to be reachable from the live default branch before synchronizing its exact SHA into the existing child issue and exact OmniFocus slice task. Refresh the parent/tracking issues and track/program OmniFocus notes with the revised disposition and frontier using their existing representations; do not duplicate the commit field where their contract does not define one. Keep re-audit docs out of the implementation diff unless the accepted plan explicitly co-locates them there.
+5. If closure requires another child, adjacent scope, a different PR boundary, changed product intent, an irreversible external action, or an unresolved authority decision, preserve the branch and ask the user to invoke `$architecture-handoff`.
+6. Post a re-audit receipt to the child issue containing the plan-section link, exact docs commit, synchronized tracking surfaces, trigger evidence, and resume point. Reconcile the implementation branch with the advanced default branch and emit that receipt to the user.
+   - For a preflight-triggered re-audit, return to Step 2, re-check the revised contract against current code, emit the revised execution preflight, and then enter Step 3.
+   - For a review-triggered re-audit, resume the triggering review's inner loop: implement and test the central fix, push it, verify the triggering review against that exact head, and only then request a fresh review.
+
+The branch is complete only when every triggered closure row has a disposition and proof and all synchronized tracking surfaces agree through their defined representations. If a later fresh review exposes an uncovered sibling in the same precise invariant-and-owner root, the scoped closure proof failed: do not append cases or run another same-boundary re-audit; preserve the branch and require `$architecture-handoff`.
 
 ## 3. Implement one PR
 
 Create a fresh branch/worktree from current default-branch HEAD unless the accepted disposition names existing work to retain or rework. Keep unrelated work untouched.
 
-Use `tdd` at the seams named by the slice. Make the specified characterization or failing tests red, implement the narrowest contract-satisfying change, and run focused checks regularly. Preserve the named single owner, authority boundary, intermediate contract, and non-goals. File adjacent improvements as follow-up issues instead of absorbing them.
+Use `tdd` at the seams named by the slice. Make the specified characterization or failing tests red, implement the narrowest contract-satisfying change, and run focused checks regularly. For each substantive failure or review finding, translate the example into its violated invariant and sibling family before editing; fix the family at its central enforcement owner when it fits the accepted contract. Preserve the named single owner, authority boundary, intermediate contract, and non-goals. File adjacent improvements as follow-up issues instead of absorbing them.
 
 Run the slice's focused and stress gates plus the repository's ordinary local suite. Commit only scoped files, push, and open one PR that links the parent and plan, records the plan commit and slice heading, and closes the child issue.
 
@@ -52,7 +68,7 @@ This step is complete when the intended PR implements every acceptance criterion
 
 ## 4. Review, certify, and merge
 
-Follow `docs/REVIEW-LOOP.md` exactly. Judge and fix findings yourself; use RAS only as that protocol permits. Before fixing blockers from each fresh review, compare them with all prior fresh reviews and verified fixes for this PR. Treat a blocker outside the pinned slice as an immediate approach-level finding. Also stop when a later fresh blocker is rooted in the same accepted ownership, authority, seam, ordering, schema, or failure-model assumption as a previously verified fix, or when the review sequence collectively widens the slice, blast radius, or transitional-seam budget. Preserve the branch, report the review/verification run IDs and causal pattern, run no further RAS cycle, and ask the user to invoke `$architecture-handoff` for re-audit.
+Follow the repository's `docs/REVIEW-LOOP.md` and the shared [review-loop baseline](../_shared/REVIEW-LOOP.md). The shared file owns finding-family and precise invariant-and-owner classification; the repository protocol may add stronger boundary, certification, CI, merge, journal, tracking, and routing rules. Judge and fix findings yourself; use RAS only as those protocols permit. Route any approach stop to the scoped re-audit branch and record the review/verification run IDs plus the precise causal pattern.
 
 After a fresh review is clean, push the final candidate, run every named stress gate, and run the repository's exact-head local certification. Dispatch hosted CI only for that certified head, verify the live PR head and required result still match, and merge that exact head. Diagnose failed CI before deciding whether any rerun is legitimate. If the base advances, repeat every gate required by the repository protocol.
 
