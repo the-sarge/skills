@@ -15,6 +15,15 @@ Contract closure converts a plausible invariant into an exhaustive, checkable pr
 
 A row may be marked covered only with a demonstrated failing mutation: name the change to the enforcement owner that should break the property, apply it, and observe that row's proving test fail. A test that still passes under that mutation does not cover the row, whatever its name says. Re-verify inherited and pre-existing tests the same way; never mark a row covered because an existing test appears to be about that case. Record the mutation and its observed failure next to the row.
 
+The mutation must be behavior-changing and discriminating, or the evidence is worthless in one of two directions:
+
+- **A mutation that changes no behavior proves nothing.** Reordering statements with no observable consequence leaves the test correctly passing, which reads as a missing test rather than a sound one. Confirm the mutation is real before concluding a row is uncovered.
+- **A mutation that trips several guards proves only that some guard fired.** If corrupting a field also invalidates a checksum covering it, the checksum branch rejects the input and the named guard is never exercised — deleting that guard then leaves the suite green. Isolate the named enforcement: delete the guard itself, or repair the collateral damage so only the guard under test can reject.
+
+Deleting each enforcement branch in turn is usually the most direct audit, because it names the guard rather than guessing at an input that reaches it.
+
+Split a row whose disposition bundles several properties, and mutate each separately. "The barrier fails" may mean the error propagates *and* the owner is poisoned; one mutation proves only one of them.
+
 A compact table is usually sufficient:
 
 | Axis or equivalence class | Expected disposition | Enforcement owner | Proof | Mutation that breaks it | Status |
