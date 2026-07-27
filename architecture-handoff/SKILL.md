@@ -52,7 +52,7 @@ Apply these architecture-specific gates:
 - **Single-owner invariant**: after the slice, each durable fact and lifecycle transition has one mutation owner. A compatibility adapter may translate, but it must not become a second state machine.
 - **Authority-complete invariant**: do not make a persisted fact authoritative unless the same slice covers its constructors, validation, restart round trip, and every destructive or security-sensitive consumer that relies on it.
 - **Transitional-seam budget**: list every duplicate representation, generic mutation path, temporary adapter, or double-open lifetime left after the slice. Explain why the intermediate state is coherent and identify the exact blocking slice that removes it. A slice may not widen a transitional seam.
-- **Behavior-preservation proof**: distinguish unchanged behavior from intended architectural change and name the gate that proves each preserved contract.
+- **Behavior-preservation proof**: distinguish unchanged behavior from intended architectural change and name the gate that proves each preserved contract. State each obligation as the regression it must detect, not as a deliverable to produce: "must fail if the commit write moves above the first barrier" is an obligation; "add single/batch two-barrier tests" is a deliverable that a partial implementation satisfies. If you cannot name the mutation an obligation catches, it is unfalsifiable and the slice is not ready to dispatch.
 
 Apply [contract closure](../_shared/CONTRACT-CLOSURE.md) whenever a slice crosses a protocol or schema, lifecycle or ordering rule, multiple entrypoints or consumers, authority source, subprocess or inherited environment, cleanup or restoration boundary, restart behavior, concurrency boundary, or security-sensitive failure path. Record the invariant, enforcement owner, real axes, behaviorally distinct equivalence classes, dispositions, and proofs in the plan. The matrix must census current code and existing review history; a list of anticipated examples is not closure.
 
@@ -93,7 +93,7 @@ Create or update exactly one **child issue per audited slice** using [TEMPLATES.
 - Link the parent track issue and source plan.
 - Describe the end-to-end delivery and acceptance criteria, not a layer-by-layer implementation recipe.
 - Record blocking child issues using native relationships when available, otherwise explicit links.
-- Restate the slice's owner, authority-completeness obligations, transitional-seam budget, blast radius, contract-closure obligation or not-triggered evidence, preservation proof, and stop condition.
+- Restate the slice's owner, authority-completeness obligations, transitional-seam budget, blast radius, contract-closure obligation or not-triggered evidence, preservation proof with each obligation stated as the regression it must detect, and stop condition.
 - Apply the repo's agent-ready label only to frontier issues whose blockers are complete. Do not label blocked work ready.
 
 Then create or update one tracking issue for the program. It tracks parent issues, recommended order, blocked markers, and the current frontier; child details remain on the parent and in the plan.

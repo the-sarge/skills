@@ -13,11 +13,13 @@ Contract closure converts a plausible invariant into an exhaustive, checkable pr
 5. Trace negative space. For every accepted form, identify malformed, missing, stale, reordered, partial, and hostile siblings that reach the same owner.
 6. Prefer one representation or validator that makes the matrix visible. Parallel checks at individual callers are evidence of an unclosed contract unless the contract explicitly assigns those callers distinct authority.
 
+A row may be marked covered only with a demonstrated failing mutation: name the change to the enforcement owner that should break the property, apply it, and observe that row's proving test fail. A test that still passes under that mutation does not cover the row, whatever its name says. Re-verify inherited and pre-existing tests the same way; never mark a row covered because an existing test appears to be about that case. Record the mutation and its observed failure next to the row.
+
 A compact table is usually sufficient:
 
-| Axis or equivalence class | Expected disposition | Enforcement owner | Proof | Status |
-|---|---|---|---|---|
-| {real case} | {accept/reject/restore/fail} | {one seam} | {test or gate} | {covered/rejected/non-goal} |
+| Axis or equivalence class | Expected disposition | Enforcement owner | Proof | Mutation that breaks it | Status |
+|---|---|---|---|---|---|
+| {real case} | {accept/reject/restore/fail} | {one seam} | {test or gate} | {mutation → observed failure} | {covered/rejected/non-goal} |
 
 ## Close a review finding as a family
 
@@ -45,4 +47,6 @@ A re-audit that merely adds the latest reported cases is incomplete. If the fami
 
 ## Completion criterion
 
-Contract closure is complete only when every observed producer, consumer, and entrypoint maps to one enforcement owner; every behaviorally distinct class has a disposition and proof; every reported example has had its sibling family inspected; and every remaining unknown is an explicit non-goal or approach stop. “Likely covered” and untraced cells do not pass.
+Contract closure is complete only when every observed producer, consumer, and entrypoint maps to one enforcement owner; every behaviorally distinct class has a disposition and proof; every covered row has a demonstrated failing mutation, including rows resting on inherited tests; every reported example has had its sibling family inspected; and every remaining unknown is an explicit non-goal or approach stop. “Likely covered”, untraced cells, and rows whose proving test was never observed to fail do not pass.
+
+A matrix asserted without mutation evidence is an inventory of assumptions, not a closure proof. Rows inherited from existing tests are the most common place this fails, because a test's name describes its intent rather than the boundary it actually pins.
