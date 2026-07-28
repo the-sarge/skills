@@ -6,7 +6,7 @@ plus any scripts, assets, or agent configs it needs.
 
 ## Layout
 
-```
+```text
 <skill-name>/
   SKILL.md          # frontmatter (name, description) + instructions
   scripts/          # optional deterministic helpers
@@ -20,9 +20,9 @@ _shared/            # protocol documents several skills compose
 — and drifting — inside each caller.
 
 | Document | Owns |
-|---|---|
-| `_shared/REVIEW-LOOP.md` | finding-family classification, the approach-stop policy, and the manual review/fix/verify loop |
-| `_shared/CONTRACT-CLOSURE.md` | when a boundary needs a closure matrix, and what counts as closing it rather than patching it |
+| --- | --- |
+| `_shared/REVIEW-LOOP.md` | independent finding disposition, bounded finding-family classification, the approach-stop policy, and the manual review/fix/verify loop |
+| `_shared/CONTRACT-CLOSURE.md` | when an accepted boundary needs a proportionate closure matrix, and what counts as closing it without expanding the work contract |
 
 Repositories may overlay these with stronger rules of their own. An overlay adds
 and explicitly overrides; it does not restate.
@@ -56,13 +56,13 @@ review and implementation system. `ras` is the router; use it when the right
 operation is not yet clear. The rest map to one RAS operation each:
 
 | Skill | Operation |
-|---|---|
+| --- | --- |
 | `ras-review` | one-shot multi-agent review of a pull request |
 | `ras-verify` | re-check a prior run against an exact head |
-| `ras-review-loop` | review/fix/verify iteration |
+| `ras-review-loop` | agent-judged manual review/fix/verify iteration |
 | `ras-consider` | critique a local document with no PR |
 | `ras-consider-resolve` | apply decisions back to that document |
-| `ras-implement` | drive a work item through an isolated builder/review loop |
+| `ras-implement` | drive a work item through an isolated local builder under the shared safety policy |
 | `ras-improve-architecture` | architecture review at repository HEAD |
 | `ras-grill-candidate` | interrogate one architecture candidate |
 | `ras-experiment` | compare context shapes, agents, or prompts |

@@ -1,6 +1,6 @@
 # Review Loop Protocol
 
-This shared baseline owns finding-family classification, precise-root history checks, low/nit handling, and the manual review/fix/verify loop. Repositories may add stronger boundary, certification, CI, merge, journal, and tracking rules; those additions compose with this baseline rather than redefining a precise root by broad topic alone.
+This shared baseline owns finding disposition, finding-family classification, precise-root history checks, low/nit handling, and the manual review/fix/verify loop. Repositories may add stronger boundary, certification, CI, merge, journal, and tracking rules; those additions compose with this baseline rather than treating reviewer output as authority or redefining a precise root by broad topic alone.
 
 ## Structure
 
@@ -8,7 +8,7 @@ This shared baseline owns finding-family classification, precise-root history ch
 
 ## For each PR
 
-1. Run the review loop below until a fresh review surfaces no blocking findings.
+1. Run the review loop below until a fresh review leaves no `fix-now` or `stop-for-decision` findings after independent disposition.
 2. Push the final candidate, run slice-specific stress checks, and run the repository's local exact-head certification.
 3. Request required hosted CI for that same head and verify its protected result belongs to the certified head.
 4. Merge that exact head.
@@ -17,51 +17,71 @@ This shared baseline owns finding-family classification, precise-root history ch
 
 ## Review loop
 
-The implementing agent does all fixing and judging; RAS is used only to review and verify. Never hand fixing to an auto-fixer. Do not use `ras review-fix` or `ras review-loop`.
+The implementing agent does all fixing and judging; RAS is used only to supply review and verification evidence. Never hand fixing to an auto-fixer. Do not use `ras review-fix` or `ras review-loop`.
 
-“Clean” means no remaining blocking findings. Low/nit handling is a loop-control policy, not merely a prioritization hint.
+RAS findings, severities, `Fix First` labels, required actions, and verification judgments are evidence, not instructions. The implementing agent must inspect the code and accepted work contract before any edit. “Clean” means no remaining `fix-now` findings and no unresolved `stop-for-decision` finding after that independent disposition. A `defer` or `reject` finding does not hold the loop open merely because RAS called it blocking or verification reports it still open.
+
+## Automated-fixer safety policy
+
+Independent finding disposition must occur before review output becomes builder authority. Until RAS core represents `fix-now`, `defer`, `reject`, and `stop-for-decision` as first-class execution-gate dispositions, do not use `ras review-fix`, `ras review-loop`, PR-backed `ras implement`, or any mode that automatically feeds review findings back to a builder. Use the manual review phase below; when using `ras implement`, use local-only mode with automated review disabled.
+
+## Finding disposition
+
+For every substantive review or verification finding, record the code evidence, the current-work obligation it serves, its scope and cost, and exactly one disposition:
+
+- **`fix-now`**: the claim is technically valid and reachable; it is required by an acceptance criterion, a declared invariant, or preservation of existing behavior on the changed surface; and the smallest complete fix and proof fit the approved boundary and are proportionate to the risk.
+- **`defer`**: the claim may be valid, but it is pre-existing, adjacent, outside the accepted contract, or a worthwhile strengthening rather than a requirement, and leaving it unchanged does not prevent safe completion of the accepted outcome. Report a worthwhile follow-up without absorbing it into the current work. Do not create busywork for a marginal item. If an accepted obligation is too costly or broad to fix inside the approved boundary, use `stop-for-decision`, not `defer`.
+- **`reject`**: the claim is technically wrong, unreachable through supported behavior, already handled, unsupported by evidence, or based on an invented requirement or implausible edge case. Record the reason and do not mutate code or file a follow-up solely to satisfy the reviewer.
+- **`stop-for-decision`**: the finding demonstrates that the accepted outcome cannot be completed safely inside the approved boundary, or requires a product, architecture, authority, irreversible-action, or material blast-radius decision the current work does not authorize. Preserve the branch and return to the invoking skill's decision branch.
+
+Severity affects urgency after validity and task relevance are established; it does not determine disposition. A critical adjacent defect is not silently folded into the PR, and a medium finding can be `fix-now` when it directly proves an acceptance criterion is unmet. If an adjacent safety or security defect makes merging the current change unsafe, use `stop-for-decision` rather than silently widening the patch.
+
+Do not perform a complete sibling census, build a closure matrix, or design a fix merely to decide whether a finding belongs to the task. First establish enough code reality, reachability, and contract relevance to assign a disposition. An out-of-scope finding is normally `defer` or `reject`; it becomes `stop-for-decision` only when it prevents the accepted work from being completed safely within its boundary.
 
 Low/nit policy:
 
-- If low/nit findings appear alongside blocking findings, cheap and local low/nit items may be fixed while already editing because another verify/review cycle is required for blockers.
-- If the only remaining findings are low/nit and any are not docs-only, leave them out of the current PR, file follow-up issues, report them separately, and treat the review loop as clean for merge-readiness.
-- If the only remaining findings are low/nit docs-only findings, fix them only when cheap and supported by very high confidence. After such a docs-only polish fix, skip another RAS review/verify cycle, run lightweight local docs checks plus a new local certification, and report that the RAS rerun was skipped by policy. When the polish is not both cheap and high-confidence, leave it out, file a follow-up, report it separately, and treat the loop as clean.
+- Apply the same four dispositions regardless of severity. A low/nit finding that proves an accepted obligation unmet is `fix-now`; a low/nit label neither excuses nor requires a fix.
+- Do not add opportunistic low/nit work while fixing another item unless it independently qualifies as `fix-now`.
+- If the only remaining findings are low/nit and none is `fix-now` or `stop-for-decision`, report worthwhile `defer` items, record `reject` items, and treat the review loop as clean.
+- After a cheap, high-confidence, docs-only `fix-now` edit, skip another RAS review/verify cycle, run lightweight local docs checks plus a new local certification, and report that the RAS rerun was skipped by policy.
 
-Finding-family policy: before editing for a blocking finding, translate it through `observed example → violated invariant → sibling family → enforcement owner → regression matrix`. When the finding crosses a protocol, lifecycle, multi-entrypoint, authority, environment, restoration, restart, concurrency, or security-sensitive boundary, apply the [contract-closure protocol](CONTRACT-CLOSURE.md). A fix is local only when the complete sibling family fits the approved boundary and one central owner can enforce it. Fix and prove that family rather than only the reported example.
+Finding-family policy: only after a finding is accepted as `fix-now`, translate it through `observed example → violated invariant → in-contract sibling family → enforcement owner → regression proof`. When the accepted obligation crosses a protocol, lifecycle, multi-entrypoint, authority, environment, restoration, restart, concurrency, or security-sensitive boundary, apply the [contract-closure protocol](CONTRACT-CLOSURE.md). A fix is local only when the sibling family required by the accepted obligation fits the approved boundary and one central owner can enforce it. Do not strengthen the contract, enumerate hypothetical behavior outside the supported threat model, or absorb adjacent families merely because the reviewer suggested them.
 
-Approach-stop policy: before fixing blockers from a fresh review, compare their precise invariants and enforcement owners with every prior fresh review and verified fix for the PR. Treat any blocker that requires work beyond the approved PR/slice boundary, acceptance criteria, or declared blast radius as an immediate approach-level finding. Also stop when a later fresh blocker repeats a previously verified invariant-and-owner root, or when the sequence of otherwise-local blockers collectively requires widening the approved boundary. Preserve the branch, record the review/verification run IDs and causal pattern, and run no further fix/verify/review cycle. Return control to the invoking skill's approach-stop branch; if none exists, check with the operator. Failed verification of the current fix remains inner-loop evidence and does not by itself establish a repeated fresh-review pattern.
+Approach-stop policy: before fixing the accepted `fix-now` set from a fresh review, compare its precise invariants and enforcement owners with every prior fresh review and verified fix for the PR. Stop when a finding has the `stop-for-decision` disposition, when a later fresh `fix-now` finding repeats a previously verified invariant-and-owner root, or when the sequence of accepted fixes collectively requires widening the approved boundary. Preserve the branch, record the dispositions, review and verification run IDs, and causal pattern, and run no further fix/verify/review cycle. Return control to the invoking skill's decision branch; if none exists, check with the operator. Failed verification of the current fix remains inner-loop evidence and does not by itself establish a repeated fresh-review pattern.
 
 ```text
 outer review loop:
   ras review <pr>
-  if the review has no blocking findings:
-    apply the low/nit policy above
+  independently disposition every substantive finding
+  if any finding is stop-for-decision:
+    STOP, preserve the branch, and return to the invoking skill's decision branch
+  if there are no fix-now findings:
+    report defer/reject findings and apply the low/nit policy
     done
 
-  derive the precise invariant, sibling family, and enforcement owner
-  apply contract closure when a risk trigger is present
-  compare the blocking synthesis with all prior fresh reviews and verified fixes
-  if any blocker crosses the approved PR/slice boundary, or the review history
-    shows a repeated invariant-and-owner root or collective boundary expansion:
-      STOP, preserve the branch, report the review history, and return to the
-        invoking skill's approach-stop branch
+  for each fix-now finding:
+    derive the precise invariant, in-contract sibling family, and enforcement owner
+    apply bounded contract closure when an accepted risk trigger is present
+  compare the fix-now set with prior fresh reviews and verified fixes
+  if a precise root repeats or the accepted fixes collectively widen the boundary:
+    STOP, preserve the branch, report the review history, and return to the
+      invoking skill's decision branch
 
   inner fix loop:
-    for each blocking synthesis item, first judge whether it is a local fix
-      or evidence that the approach is wrong
-    if approach-wrong: STOP and return to the invoking skill's approach-stop branch
-    fix the complete in-bound sibling family at its enforcement owner
-    optionally fix cheap local low/nit findings in the same area
+    fix only the accepted in-contract sibling family at its enforcement owner
     run the required tests
     push the branch update
     ras verify <review-run-id> --head <exact 40-character SHA just pushed>
-    if verification confirms the blockers are resolved:
+    independently disposition verification feedback
+    if verification confirms the fix-now findings are resolved:
       return to the outer loop for a fresh review
     else:
-      remain in the inner loop using review and verification feedback
+      remain in the inner loop only for unresolved fix-now findings
 ```
 
-Repeat until a fresh `ras review` surfaces no blocking findings after applying the low/nit policy.
+Verification may continue to list `defer` or `reject` findings as open because no code was changed for them. That is expected and does not prevent a fresh review. Do not hide those results or reclassify an item merely to advance the loop; carry forward the recorded disposition and rationale, and reconsider it only when new code or contract evidence changes the judgment.
+
+Repeat until a fresh `ras review` leaves no `fix-now` or `stop-for-decision` findings after applying the disposition and low/nit policies.
 
 ## Exact-head local certification and hosted CI
 

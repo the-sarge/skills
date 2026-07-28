@@ -20,23 +20,23 @@ Use this skill as the router for broad RAS requests. RAS means review, adjudicat
 
 - Use `ras-inspect` for project status, run history, reports, artifacts, stale-run summaries, or `ras serve`.
 - Use `ras-review` for a one-shot GitHub PR review, posting a stored review, or an approach gate before mutating PR workflows.
-- Use `ras-review-loop` when the user explicitly asks RAS to review, fix, verify, and repeat until clean, and the approach risk gate says the PR foundation is sound enough for automated fixing.
+- Use `ras-review-loop` when the user explicitly asks for review, independent finding disposition, agent-performed fixes, verification, and repetition until clean.
 - Use `ras-verify` for one-shot verification of a prior PR review or consideration run.
 - Use `ras-consider` for critique of a local PRD, design doc, implementation plan, or other repository file, especially when the next decision is whether a proposed approach is viable.
 - Use `ras-consider-resolve` for decision packets, document fixing, apply/resume/abort, or `ras fix <consider-run-id> --decisions <file>` after approach-defining decisions have been made.
 - Use `ras-improve-architecture` for multi-agent codebase architecture review at repository `HEAD`, deepening candidate synthesis, and post-run grilling handoff.
-- Use `ras-implement` when the user wants RAS to drive a clear, approach-ready work item through an isolated builder/review loop.
+- Use `ras-implement` when the user wants RAS to drive a clear, approach-ready work item in an isolated builder worktree; follow the shared automated-fixer safety policy.
 - Use `ras-benchmark` for benchmark manifests, benchmark plan/run/resume/evaluate/synthesize/report workflows, or benchmark result interpretation.
 - Use `ras-experiment` for context-shape, delivery-mode, agent, prompt, or evaluator comparison against a PR.
 - Use `ras-admin` for `ras init`, bundled skill installation, adapter tests, capabilities, cleanup, or version checks.
 
 ## Approach Risk Gate
 
-Before choosing a mutating loop, decide whether the next likely finding could mean the current implementation strategy is wrong rather than merely incomplete. If yes, route to read-only `ras-review` for PRs or `ras-consider` for plans first, read the synthesis, and keep the operator in the decision seat before any builder or fixer runs.
+Before choosing a mutating workflow, decide whether the implementation strategy is sufficiently specified. If not, route to read-only `ras-review` for PRs or `ras-consider` for plans first. In every case, treat review output as evidence and apply the shared [finding-disposition policy](../_shared/REVIEW-LOOP.md) before any review-driven mutation.
 
 Treat shell/process control, concurrency/lifecycle orchestration, auth/security boundaries, data migrations or destructive writes, parser/protocol rewrites, API or architecture changes, and unfamiliar dependency strategies as approach-risky by default. Use `ras-review-loop`, `ras-implement`, `ras-consider-resolve`, or `ras fix` after that gate only when the foundation is still sound and the remaining findings are patches on that foundation.
 
-If the user explicitly asks for a complete mutating loop on approach-risky work, call out the risk, use conservative loop caps, and stop on repeated or foundational critical findings instead of retrying indefinitely.
+If the user explicitly asks for a complete mutating loop, use the manual `ras-review-loop`, conservative loop caps, and its `fix-now`, `defer`, `reject`, and `stop-for-decision` policy. Severity alone does not establish a foundational stop.
 
 ## Broad Status Pattern
 
@@ -51,4 +51,4 @@ For "what is the status of this project?" or "where are we?":
 
 ## Safety
 
-Plain inspection commands such as `ras status`, `ras status --json`, `ras show`, `ras show --json`, `ras report --output -`, and read-only `ras serve` are safe for normal diagnostics. Mutating workflows such as `ras implement`, `ras review-fix`, `ras review-loop`, `ras consider-resolve`, `ras fix`, `ras cleanup stale-runs --apply`, and forceful skill/config writes should be serialized per target and called out clearly before running.
+Plain inspection commands such as `ras status`, `ras status --json`, `ras show`, `ras show --json`, `ras report --output -`, and read-only `ras serve` are safe for normal diagnostics. Mutating workflows should be serialized per target and called out clearly before running. Follow the shared [automated-fixer safety policy](../_shared/REVIEW-LOOP.md).

@@ -54,12 +54,12 @@ Wait for the command to finish and read the final verification synthesis. Do not
 
 While `ras verify` is actively running, monitor that command's own output as the primary progress source. Use `ras status`, `ras show`, `ras report`, or `ras serve` for explicit diagnostics or after verification completes rather than as a polling loop, and do not run cleanup/admin mutations while verification may still own local state.
 
-When reporting back, include the verified run id, PR or consideration target, head SHA when used, whether the verification was clean, unresolved findings, command failures, and where to inspect artifacts with `ras status <run-id> --json`, `ras show <run-id> --json`, `ras report <run-id>`, or `ras serve`.
+When reporting back, include the verified run id, PR or consideration target, head SHA when used, RAS's verification judgment, the implementing agent's disposition of every unresolved or new finding when this is part of a manual review loop, command failures, and where to inspect artifacts with `ras status <run-id> --json`, `ras show <run-id> --json`, `ras report <run-id>`, or `ras serve`.
 
 ## Safety Notes
 
 - Do not verify against an unpushed or stale local commit; use the PR head SHA when verification gates a PR update.
 - Do not assume unrelated uncommitted local files are visible to verifier agents; commit/push them, include them as consideration context refs, or treat true dirty-workspace verification as outside current `ras verify` behavior.
-- Do not run a fresh `ras review` in a manual review loop until verification resolves the prior blocking findings.
+- In a manual review loop, apply the shared [finding-disposition policy](../_shared/REVIEW-LOOP.md) to verification output. Do not run a fresh `ras review` until every prior `fix-now` finding is resolved and no verification finding is `stop-for-decision`. A previously recorded `defer` or `reject` finding may remain open in RAS without holding the loop open.
 - Do not treat consideration verification as applying changes to the caller checkout; it only verifies the current source-aware document state.
 - Do not hide verifier failures, missing verifier agents, parse failures, or source identity mismatches.
