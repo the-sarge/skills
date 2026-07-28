@@ -20,7 +20,7 @@ Use `ras verify` when the user wants RAS to check whether a changed PR head or l
 4. For PR review verification, fetch the pushed PR head and use `--head <40-character-sha>` when the user or workflow needs protection against verifying the wrong commit.
 5. For consideration verification, do not pass `--head`; RAS uses stored source metadata and document fingerprints.
 6. Check `.ras/config.yaml`, then `~/.config/ras/config.yaml` if verifier agent, model profile, or source identity behavior matters.
-7. When verification belongs to an engineering review loop, recover the source review's accepted findings, representation domain and owner, guarantee level, artifact classes, and terminating evidence plan. Verification is scoped to those accepted findings; it is not a fresh review.
+7. When verification belongs to an engineering review loop, recover the source review's accepted contract and findings required by the shared [review briefing](../_shared/REVIEW-LOOP.md#review-briefing). Verification is scoped to those accepted findings; it is not a fresh review.
 
 ## Run Pattern
 
@@ -61,6 +61,6 @@ When reporting back, include the verified run id, PR or consideration target, he
 
 - Do not verify against an unpushed or stale local commit; use the PR head SHA when verification gates a PR update.
 - Do not assume unrelated uncommitted local files are visible to verifier agents; commit/push them, include them as consideration context refs, or treat true dirty-workspace verification as outside current `ras verify` behavior.
-- In a manual review loop, apply the shared [finding-disposition policy](../_shared/REVIEW-LOOP.md) to verification output. Independently disposition a new observation, but do not silently broaden verification into a fresh review, mutate external syntax to approximate parser coverage, or expand the terminating evidence plan. A second behaviorally distinct semantic counterexample at the same invariant and enforcement owner stops the approach whether review or verification found the first. Do not run the one allowed replacement `ras review` until every source-review `fix-now` finding is resolved and no verification finding is `stop-for-decision`. A recorded `defer` or `reject` finding may remain open in RAS without holding the loop open.
+- In a manual review loop, feed verification output through the shared [finding disposition](../_shared/REVIEW-LOOP.md#finding-disposition), [approach stops](../_shared/REVIEW-LOOP.md#approach-stops), and [bounded review algorithm](../_shared/REVIEW-LOOP.md#bounded-review-algorithm). A recorded `defer` or `reject` finding may remain open in RAS without holding the loop open.
 - Do not treat consideration verification as applying changes to the caller checkout; it only verifies the current source-aware document state.
 - Do not hide verifier failures, missing verifier agents, parse failures, or source identity mismatches.

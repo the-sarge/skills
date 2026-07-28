@@ -32,7 +32,7 @@ Apply the shared automated-fixer safety policy. Run local implementation with `-
 2. Inspect `git status --short`; avoid starting a loop from an unintended dirty base. If changes are present, account for them explicitly.
 3. Check that `ras` is available with `command -v ras`. If working inside the `ras` source repo and a fresh local binary is needed, build or run the local CLI intentionally.
 4. Check the builder config if behavior matters: `.ras/config.yaml`, then `~/.config/ras/config.yaml`.
-5. Ensure the requested work item is precise enough for an autonomous builder. It must state the current outcome, acceptance criteria, preserved behavior on the changed surface, non-goals, approved blast radius, supported representation domain and owner, universal/canonical-subset/example-level guarantee, material artifact classes, terminating evidence plan, and evidence and context budgets. For each universal criterion, require the supported domain, representation owner, guarantee level, and finite terminating evidence. If it is vague, claims broad coverage of an open external grammar through a handwritten scanner, or is otherwise high risk, tighten it, narrow the guarantee, return `stop-for-decision`, or use read-only consideration before invoking the builder.
+5. Ensure the requested work item is precise enough for an autonomous builder. It must state the outcome, acceptance criteria, preserved behavior on the changed surface, non-goals, and approved blast radius, and must satisfy the applicable contract fields and gates in the shared [contract-closure policy](../_shared/CONTRACT-CLOSURE.md). If it is vague, fails a shared gate, or is otherwise high risk, tighten it or use read-only consideration before invoking the builder.
 
 ## Choose The Work Item Source
 
@@ -129,7 +129,7 @@ If the loop fails with `blocked`, `stuck`, or `max_iters`, inspect the implement
    git -C <worktree-path> diff <base-ref>...HEAD --stat
    ```
 
-3. Run the project's accepted, budgeted verification commands in the implementation worktree, not the original checkout. Do not recursively impose closure on tests or harnesses, expand platforms or repetition without an accepted risk basis, or let a verification aid block shipped behavior unless the work item explicitly approves it as a maintained deliverable with payoff, domain, owner, and retirement policy.
+3. Run the project's verification commands in the implementation worktree, not the original checkout, under the shared artifact, evidence-budget, and non-recursion policies.
 4. Use `ras status <run-id> --json` or `ras show <run-id> --json` for structured agent-readable inspection, and use `ras serve` or `ras report` when the user needs browsable stored history, review findings, or artifacts.
 5. Tell the user where the result lives and whether it needs merge, cherry-pick, push, PR review, or follow-up fixes.
 

@@ -10,7 +10,7 @@ Use `ras consider-resolve` when the user wants RAS to turn consideration finding
 
 ## Operating Model
 
-`ras consider-resolve <file>` runs an initial consideration, writes a decision packet, waits for a Markdown decisions file or invokes the configured decision command, validates decisions, runs the fixer in a RAS-owned result worktree, verifies the edited document against the prior finding set, and returns to at most one replacement consideration before reporting `done` for an engineering contract.
+`ras consider-resolve <file>` runs the considerations permitted by the shared bounded-review policy, writes a decision packet, waits for a Markdown decisions file or invokes the configured decision command, validates decisions, runs the fixer in a RAS-owned result worktree, verifies the edited document against the prior finding set, and reports the bounded result.
 
 The caller checkout is the starting snapshot, not the live edit target. After the result worktree exists, fixer passes, verification, and fresh consideration read the document copy inside `.ras/worktrees/consider-resolve/<resolve-id>/worktree`. The caller file changes only when the user runs `ras consider-resolve apply <resolve-id>` and the caller file still matches the fingerprint captured at session start.
 
@@ -18,7 +18,7 @@ Standalone `ras fix <consider-run-id> --decisions <file>` runs one source-aware 
 
 ## Approach Decision Gate
 
-Before invoking the fixer, separate document edits from decisions about the document's direction. If findings could invalidate the plan, product choice, architecture, migration strategy, representation owner or guarantee level, maintained status of a verification aid, or other foundation, mark them `needs_human` or ask the user; do not ask the fixer to preserve the current text by patching around an unresolved approach decision. A handwritten scanner claiming broad coverage of an open external grammar is `needs_human`; do not address it by adding syntax cases.
+Before invoking the fixer, separate document edits from decisions about the document's direction. Map shared representation, artifact, or approach stops to `needs_human`; do not ask the fixer to preserve the current text by patching around an unresolved foundation decision.
 
 ## Before Running
 
@@ -27,7 +27,7 @@ Before invoking the fixer, separate document edits from decisions about the docu
 3. Confirm the target document and any `file:` context refs are inside the repository.
 4. Check that `ras` is available with `command -v ras`.
 5. Check `.ras/config.yaml`, then `~/.config/ras/config.yaml` when decision method, fixer command, model profile, loop caps, gate categories, or environment inheritance matter.
-6. For an engineering contract, recover its representation domain and owner, guarantee level, artifact classes, terminating evidence plan, and evidence and review budgets. Keep the resolution scoped to those fields and the independently accepted findings.
+6. For an engineering contract, recover the fields required by the shared [review briefing](../_shared/REVIEW-LOOP.md#review-briefing) and keep resolution scoped to independently accepted findings.
 
 ## Full Resolution
 
@@ -101,7 +101,7 @@ Decision files are Markdown with exactly one fenced JSON block. The JSON must ma
 
 Do not invent decisions. If a finding is a product or scope choice the user has not made, leave it as `needs_human` or ask the user before amending the file.
 
-Rejected and deferred findings are durable decisions, not ignored text. They stop the same stable finding fingerprint from repeatedly blocking the one replacement consideration for the same resolution lineage. A later new non-critical root is normally `defer` or `needs_human`, not authorization for another fix/verify/consider cycle; only a directly in-scope critical safety defect may explicitly override the review budget.
+Rejected and deferred findings are durable decisions, not ignored text. Apply the shared [bounded review algorithm](../_shared/REVIEW-LOOP.md#bounded-review-algorithm) to any replacement consideration, mapping its dispositions to this workflow's decision vocabulary.
 
 ## Handling Output
 
@@ -117,6 +117,6 @@ While `ras consider-resolve`, `ras fix`, or `ras verify` is actively running, mo
 
 - Do not edit the caller document directly unless the user explicitly asks outside the RAS workflow.
 - Do not attach public `ras fix` to an existing full-loop session unless RAS prints an explicit resume or apply command.
-- Do not treat a clean verification as final `done`; full resolution still requires the one allowed replacement consideration and independent disposition against the terminating evidence plan. It does not require repeated consideration until reviewer creativity is exhausted.
+- Do not treat a clean verification as final `done`; finish the shared bounded-review algorithm and independently disposition the result.
 - Do not bypass apply drift checks by copying files manually unless the user explicitly takes over reconciliation.
 - Do not push, post to GitHub, or mutate external systems as part of consider-resolve.

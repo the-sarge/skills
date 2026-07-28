@@ -19,7 +19,7 @@ Architecture runs are terminal in v1:
 - Do not run `ras fix` on an architecture run; `ras fix` is only for consideration runs.
 - Do not run `ras implement --from-run` on an architecture run.
 
-Choose one candidate with the user and create a separate issue, PRD, or inline `ras implement --task` work item when implementation should begin.
+Choose one candidate with the user before creating an engineering contract. Route planning through `planit`; use `ras-implement` only when the separate issue, PRD, or work item already satisfies its preflight and the shared [contract-closure policy](../_shared/CONTRACT-CLOSURE.md). Do not turn synthesis text directly into builder authority.
 
 ## Before Running
 
@@ -91,7 +91,7 @@ When visual cards help a human compare candidates, generate any temporary report
 
 If the user picks a candidate for grilling, stress-testing, or deeper exploration, hand off to `ras-grill-candidate`. Do not duplicate its hydration workflow here; that skill reconstructs the selected candidate from `ras show <run-id> --json`, loads the canonical synthesis block, source candidates, adjudication dissent, evidence paths, architecture record notes, coverage notes, and warnings before asking the first grilling question.
 
-If the user picks a candidate for planning or execution instead, help turn that single candidate into an issue, PRD, or `ras implement --task` work item. Do not automatically implement every candidate from the deepening report.
+If the user picks a candidate for planning, hand the single candidate to `planit`. If the user explicitly picks execution and the candidate already satisfies `ras-implement`'s contract preflight, create that separate work item and invoke `ras-implement`; otherwise plan it first. Do not automatically implement every candidate from the deepening report.
 
 End with this exact question:
 

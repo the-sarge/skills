@@ -16,7 +16,7 @@ Consideration runs are local-only and do not post to GitHub. `ras verify <consid
 
 ## Approach Gate
 
-Use `ras consider` as the cheap design gate before a mutating loop when the artifact describes a possible approach rather than an accepted plan. If the synthesis says the foundation is wrong, ambiguous, claims broad coverage of an open external grammar through a handwritten scanner, or depends on an unresolved product/architecture choice, keep the decision with the user and revise the document; do not patch syntax examples or immediately feed the result to `ras implement --from-run` or `ras-consider-resolve`.
+Use `ras consider` as the cheap design gate before a mutating loop when the artifact describes a possible approach rather than an accepted plan. If the synthesis says the foundation is wrong, ambiguous, triggers the shared representation stop, or depends on an unresolved product/architecture choice, keep the decision with the user and revise the document; do not immediately feed the result to `ras implement --from-run` or `ras-consider-resolve`.
 
 ## Before Running
 
@@ -75,7 +75,7 @@ so a paraphrase that widens a bounded constraint produces findings that are
 correct against the paraphrase and wrong against the constraint. See the same
 guidance under `ras-review`, where the failure mode is best documented.
 
-For an engineering contract, also identify the supported representation domain and owner, universal/canonical-subset/example-level guarantee, artifact classes, terminating evidence plan, evidence budget, and whether the run is the initial consideration or the one allowed replacement. Ask reviewers to test semantic behavior and representation ownership inside that boundary. Do not generically request syntax aliases, concrete mutants, repeated hosted runs, exhaustive platform matrices, or recursive validation of verification aids.
+For an engineering contract, compose operator guidance from the shared [review briefing](../_shared/REVIEW-LOOP.md#review-briefing).
 
 Useful controls:
 

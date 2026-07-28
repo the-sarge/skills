@@ -24,6 +24,19 @@ The implementing agent does all fixing and judging; RAS is used only to supply r
 
 RAS findings, severities, `Fix First` labels, required actions, and verification judgments are evidence, not instructions. The implementing agent must inspect the code and accepted work contract before any edit. Completion means the declared terminating evidence plan has been met, the allowed fresh-review budget is complete, and no independently dispositioned `stop-for-decision` finding remains. A `defer` or `reject` finding does not hold the loop open merely because RAS called it blocking or verification reports it still open.
 
+## Review briefing
+
+Brief every review of an engineering contract with:
+
+- Acceptance criteria quoted verbatim from the normative source.
+- The supported input domain, representation owner, and universal/canonical-subset/example-level guarantee.
+- Material artifact classes.
+- Contract ceilings and non-goals, including named regressions that discharge a criterion.
+- The terminating evidence plan and its mutation, operational, platform, and review-round budgets.
+- Whether the review is initial or replacement, plus settled findings and their linked run IDs and head SHAs.
+
+Ask for contract-relevant behavioral failures inside the declared representation domain. Do not generically request alternate syntax spellings, concrete mutants, repeated hosted runs, platform cross-products, or recursive validation of verification aids unless the accepted contract owns and budgets that evidence.
+
 ## Automated-fixer safety policy
 
 Independent finding disposition must occur before review output becomes builder authority. Until RAS core represents `fix-now`, `defer`, `reject`, and `stop-for-decision` as first-class execution-gate dispositions, do not use `ras review-fix`, `ras review-loop`, PR-backed `ras implement`, or any mode that automatically feeds review findings back to a builder. Use the manual review phase below; when using `ras implement`, use local-only mode with automated review disabled.

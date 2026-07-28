@@ -57,8 +57,8 @@ Report findings by impact and cite exact workflow paths, Taskfile tasks, runs, o
 
 Produce a migration that includes:
 
-- artifact classification for shipped behavior, required safety enforcement, verification aids, and process/traceability metadata, including payoff, supported domain, owner, and retirement policy for any verification aid proposed as a product blocker;
-- the supported input domain, trusted representation owner, universal/canonical-subset/example-level guarantee, and finite terminating evidence for every universal classifier or workflow criterion;
+- the shared artifact classification and any explicitly approved blocking-aid exception;
+- the shared representation-gate result for every universal classifier or workflow criterion;
 - change categories and fail-closed classification rules;
 - proposed `docs-check`, `check`, `deep-check`, and `release-check` Taskfile lanes, adapted to existing names when appropriate;
 - a job graph that runs a cheap core gate before expensive jobs;
@@ -68,11 +68,11 @@ Produce a migration that includes:
 - hosted versus self-hosted runner choices;
 - the stable required check and GitHub ruleset transition;
 - validation, observation, and rollback steps;
-- a risk-based mutation, platform, hosted-run, repetition, timing, and security-fixture evidence budget;
+- the shared evidence budget plus any repository-specific exception;
 - exceptions to the default policy with repository evidence;
 - an estimate or qualitative ranking of savings.
 
-When a proposed checker claims broad coverage over GitHub Actions YAML, Taskfiles, shell, or another external language, require an authoritative parser or validator or a mechanically enforced canonical subset before semantic checks. A handwritten string or line scanner cannot own a universal external grammar; narrow its guarantee to example-level regression coverage or stop for a design decision. Treat alternate syntax spellings as representation aliases rather than semantic classifier cases unless the changed implementation owns that syntax.
+Apply the shared representation gate to proposed checkers over GitHub Actions YAML, Taskfiles, shell, or another external language. For GitHub Actions YAML, record the chosen authoritative parser/validator or mechanically enforced canonical subset before semantic checks.
 
 For a repository that uses agent-side review before CI, prefer the minimal cost-first migration unless repository evidence requires more automation: stop automatic certifying CI on PR updates, retain or add explicit dispatch with a fail-closed binding to the exact requested head SHA, keep the required context stable, and let its absence on a new head block merging until the agent requests CI for that head. A branch-only dispatch is insufficient because the branch can advance between review and workflow start. GitHub may omit `workflow_dispatch` job checks from the PR required-status rollup even when the check suite names the PR; when live evidence confirms that behavior, publish the generic required CI commit status as pending after exact-head binding and success or failure after aggregation. Give the dispatch aggregate check a different display name because GitHub may require both a same-named check and status. That status reports CI only and must not encode which review tool ran or what it decided. Treat Task wrappers as optional agent interfaces; do not add labels, webhooks, statuses, or workflow inputs merely to represent the out-of-band review decision.
 
@@ -94,7 +94,7 @@ Proceed only when the user explicitly asks to implement or has approved the plan
 7. Keep the diff scoped to CI standardization.
 8. For an approved agent-gated migration, remove automatic open and synchronize certification from `pull_request` and `pull_request_target`, remove newly unreachable event branches, preserve an explicit full/fail-closed operator path with generic head/base inputs, and add a workflow contract that prevents automatic PR certification from returning. Prefer exact-head dispatch; consider a one-shot generic operator event only after live evidence shows dispatch cannot satisfy the required PR rollup. If a generic commit-status bridge is needed for ruleset attribution, grant `statuses: write` only to the jobs that publish pending and final CI states, link the status to the run, give the dispatch aggregate check a distinct display name, guard terminal publication against cancellation, reject every cancelled run even if cancellation races with an already-started status request, and make failure reporting fail closed. Keep any automatic cheap preflight separate from the required certification check, and keep RAS names and verdicts out of all GitHub workflow and status state.
 9. Do not open the migration PR without considering the bootstrap effect: the old default-branch workflow may start one final automatic CI run. Opening, cancelling, rerunning, or dispatching that run requires the user's authorization.
-10. Keep verification aids off the product critical path unless the approved plan explicitly makes them maintained deliverables with an operational payoff, supported representation domain, owner, and retirement policy. Do not recursively apply closure to tests, fixtures, scanners, or validation harnesses.
+10. Apply the shared artifact-blocking and non-recursion policies to tests, fixtures, scanners, and validation harnesses.
 
 ## Validate
 
@@ -109,9 +109,9 @@ Validate in proportion to the change:
 7. If authorized to open a test PR, observe actual check names and skipped-job behavior before changing required checks.
 8. For agent-gated validation, demonstrate that PR open/synchronize events start no certifying jobs, an intermediate head consumes no certifying runner time, the operator trigger produces a required result in the PR rollup for the exact requested head/base/merge binding that the live ruleset actually credits, the dispatch check name does not collide with the required status context, a newer SHA cannot reuse that success, the agent verifies the run head and live PR head, and the required result remains absent before the operator trigger or pending while CI runs. Use at most one representative cancellation/bypass canary per enforcement owner by default. Inspect the PR status rollup and attempt the guarded merge; a green workflow run alone is insufficient evidence.
 
-Keep validation inside the approved evidence budget. Expand platforms only for material behavioral differences or an accepted support contract; require an incident, prior instability, SLO, statistical question, or external certification for repeated runs; require a product or operational deadline for exact timing fixtures; and identify semantic versus redundant cells in platform or security matrices. “More confidence” does not authorize additional hosted experiments.
+Keep validation inside the shared evidence budget and record the CI-specific basis for any platform, repetition, timing, hosted-run, or security-matrix exception.
 
-When RAS is part of the migration, brief one initial review with the accepted representation domain, guarantee level, artifact classes, terminating evidence plan, and review budget. Verify independently accepted `fix-now` findings and run at most one replacement review under the shared review-loop policy. Verification observations do not silently expand review, and a second behaviorally distinct semantic counterexample at the same invariant and owner stops the approach.
+When RAS is part of the migration, use the shared [review briefing](../_shared/REVIEW-LOOP.md#review-briefing) and [bounded review algorithm](../_shared/REVIEW-LOOP.md#bounded-review-algorithm).
 
 Do not claim that a workflow saves minutes merely because YAML parses. Explain which jobs no longer start and under which events.
 

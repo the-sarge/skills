@@ -18,7 +18,7 @@ It does not post to GitHub unless `--post` is passed or the user later runs `ras
 
 Use one-shot review as the default first move when a PR touches an approach-defining area and a likely finding could invalidate the implementation strategy. Examples include shell job control or process groups, concurrency/lifecycle orchestration, security/auth boundaries, migrations or data loss, parser or protocol changes, major dependency choices, and broad architecture/API shape changes.
 
-When the synthesis contains a critical or high finding that appears to attack the foundation, first validate it against the code and accepted work contract using the shared [finding-disposition policy](../_shared/REVIEW-LOOP.md). Do not automatically route it into `ras review-fix` or ask a builder to preserve the design. A handwritten scanner claiming broad coverage over an open external grammar without an authoritative parser, validator, or enforced canonical subset is an immediate `stop-for-decision`; do not patch the syntax example first. Otherwise use `stop-for-decision` only when the finding demonstrates that the accepted outcome cannot be completed safely inside its boundary; classify other findings as `fix-now`, `defer`, or `reject`.
+When the synthesis contains a critical or high finding that appears to attack the foundation, first validate it against the code and accepted work contract using the shared [finding-disposition](../_shared/REVIEW-LOOP.md#finding-disposition) and [approach-stop](../_shared/REVIEW-LOOP.md#approach-stops) policies. Do not automatically route it into `ras review-fix` or ask a builder to preserve the design.
 
 ## Before Running
 
@@ -79,22 +79,18 @@ stated as "two regressions: must fail if X, must fail if Y" as "X and Y hold
 generally" converts a bounded obligation into an open one, and the resulting
 findings are correct against the text supplied.
 
-A useful prompt states these things:
+A useful prompt composes the shared [review briefing](../_shared/REVIEW-LOOP.md#review-briefing) with these mechanics:
 
 - **Criteria, verbatim.** Copy the acceptance criteria from their source.
-- **Representation contract.** State the supported input domain, representation owner, and universal/canonical-subset/example-level guarantee. Ask for contract-relevant behavioral failures inside that domain, not alternate syntax spellings owned by an upstream parser or excluded canonicalization boundary.
 - **Ceilings, not only prohibitions.** Where a criterion names the regressions
   that discharge it, say so: a finding demanding a stronger property than a
   named regression belongs under follow-ups, not `Fix First`. Prohibitions alone
   bound the directions you already anticipated; ceilings bound the ones you did
   not.
-- **Artifact class.** Classify material artifacts as shipped behavior, required safety enforcement, verification aid, or process/traceability metadata. A finding against an aid or metadata receives proportionate weight and cannot silently strengthen shipped behavior or make an unapproved aid a product blocker.
-- **Terminating evidence plan.** State the accepted semantic cases, mutation and operational evidence budgets, and the finite completion criterion. Do not generically request concrete mutants, syntax variants, repeated hosted runs, or platform cross products unless the accepted scope owns and budgets them.
-- **Review budget.** State whether this is the initial review or the one allowed replacement. A later new non-critical root after the replacement is normally a follow-up or a decision stop, not the start of another loop.
 - **What is already settled.** For a later round, list what prior rounds closed,
   with run ids and head SHAs, so a fresh review does not relitigate it.
 
-For the one replacement review, also state the round number and any declared shape of the change, such as a slice specified as net deletion. A reviewer told that a deletion has grown can weigh findings that reduce surface.
+For a replacement review permitted by the baseline, also state the round number and any declared shape of the change, such as a slice specified as net deletion. A reviewer told that a deletion has grown can weigh findings that reduce surface.
 
 Derive the prompt from the source document mechanically. Composing it freehand
 from memory of the contract reintroduces the paraphrase problem the file exists
@@ -138,7 +134,7 @@ If independent disposition produces `stop-for-decision`, summarize the operator 
 
 If the user asks to fix findings after a review, do not silently start a complete loop. Independently disposition the findings, fix only the `fix-now` set as requested, and use `ras-review-loop` only when they ask for review/fix/verify iteration. Follow the shared automated-fixer safety policy.
 
-When the review is part of a manual loop, compare accepted findings with review and verification history by precise invariant and enforcement owner. A second behaviorally distinct semantic counterexample at the same root stops the approach regardless of which phase found it. One initial review plus at most one replacement is the default budget; completion rests on the accepted evidence plan, not on asking reviewers until none can invent another case.
+When the review is part of a manual loop, apply the shared [approach stops](../_shared/REVIEW-LOOP.md#approach-stops) and [bounded review algorithm](../_shared/REVIEW-LOOP.md#bounded-review-algorithm) to its result.
 
 ## Safety Notes
 
