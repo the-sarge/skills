@@ -20,6 +20,8 @@ Require the child issue to contain all of the following:
 
 Read the repository instructions, child and parent issues, the plan at the recorded commit, the current default-branch version of that plan, the program index, referenced ADR/domain docs, and `docs/REVIEW-LOOP.md`. Read `docs/CONTRACT-CLOSURE.md` when present, otherwise use the shared [contract-closure reference](../_shared/CONTRACT-CLOSURE.md). Stop if the review protocol is absent.
 
+Read the shared [review-loop baseline](../_shared/REVIEW-LOOP.md) here, not when the review loop begins. It owns the approach-stop policy that decides when to stop fixing, and that policy has to be in hand before the first finding arrives. A repository protocol that omits a baseline rule has not overridden it; only an explicit, reasoned override composes. Where the two disagree without such an override, the baseline governs and the divergence is worth reporting.
+
 Verify every blocker is closed, the issue is on the current implementation frontier, and the current plan still agrees materially with the recorded contract. If the plan changed after the recorded commit, inspect that diff; continue only when the slice contract is unchanged or the child issue was explicitly synchronized with the accepted revision.
 
 Inspect any open PR or implementation branch named by the issue or plan. Continue it only under the recorded retain/rework disposition. Treat unmentioned existing work as evidence to evaluate, never as an implicit baseline.
@@ -72,6 +74,12 @@ This step is complete when the intended PR implements every acceptance criterion
 ## 4. Review, certify, and merge
 
 Follow the repository's `docs/REVIEW-LOOP.md` and the shared [review-loop baseline](../_shared/REVIEW-LOOP.md). The shared file owns finding-family and precise invariant-and-owner classification; the repository protocol may add stronger boundary, certification, CI, merge, journal, tracking, and routing rules. Judge and fix findings yourself; use RAS only as those protocols permit. Route any approach stop to the scoped re-audit branch and record the review/verification run IDs plus the precise causal pattern.
+
+Run reviews through `ras-review` and verifications through `ras-verify` rather than invoking the CLI directly. Those skills carry run handling, low/nit loop control, and the routing that presents a foundational critical or high finding to the operator as a choice before any fix; a direct CLI call silently drops all of it.
+
+Brief every review. Follow `ras-review`'s operator-guidance section and build the prompt from the child issue itself — acceptance criteria, terminating rule, and out-of-scope section quoted verbatim, never paraphrased. A criterion that names the regressions discharging it is a ceiling: say so in the prompt, so a finding demanding a stronger property arrives as a follow-up rather than as `Fix First`. From the second review onward, add the round number, what earlier rounds closed with their run ids and head SHAs, and any declared shape of the change the slice was specified to have, such as net deletion.
+
+Before each inner fix loop, write down the comparison the baseline requires: each blocking finding's precise invariant and enforcement owner set against every prior fresh review and verified fix, and the criterion or closure-matrix row it serves. A finding that serves none is beyond the acceptance criteria, which is an approach-level finding under the baseline, not a local fix. Recording this is what makes the approach-stop conditions checkable instead of remembered.
 
 After a fresh review is clean, push the final candidate, run every named stress gate, and run the repository's exact-head local certification. Dispatch hosted CI only for that certified head, verify the live PR head and required result still match, and merge that exact head. Diagnose failed CI before deciding whether any rerun is legitimate. If the base advances, repeat every gate required by the repository protocol.
 

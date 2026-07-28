@@ -68,6 +68,13 @@ ras consider <file> --kind prd --prompt "Stress-test scope, risks, and acceptanc
 ras consider <file> --kind design --prompt-file ./consider-prompt.md
 ```
 
+When constraints on the document live outside it — a parent plan, a program
+boundary, a prior decision that closed a direction — quote them into the prompt
+rather than summarizing them. Reviewers hold the document to the text supplied,
+so a paraphrase that widens a bounded constraint produces findings that are
+correct against the paraphrase and wrong against the constraint. See the same
+guidance under `ras-review`, where the failure mode is best documented.
+
 Useful controls:
 
 ```bash

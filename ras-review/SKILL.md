@@ -65,6 +65,42 @@ ras review <pr> --prompt "Review correctness, security, migrations, and tests."
 ras review <pr> --prompt-file ./review-prompt.md
 ```
 
+### Composing operator guidance
+
+When the work under review has a written contract — an issue with acceptance
+criteria, a PRD, an approved plan, a closure matrix — pass that contract through
+`--prompt-file`. Reviewers cannot infer the boundary of the work from the diff,
+so an unbriefed review reports every true defect it can find, including defects
+in behaviour the contract never asked for.
+
+Quote the contract; do not summarize it. A paraphrase silently restates the
+scope, and reviewers hold the work to the paraphrase. Reproducing an obligation
+stated as "two regressions: must fail if X, must fail if Y" as "X and Y hold
+generally" converts a bounded obligation into an open one, and the resulting
+findings are correct against the text supplied.
+
+A useful prompt states four things:
+
+- **Criteria, verbatim.** Copy the acceptance criteria from their source.
+- **Ceilings, not only prohibitions.** Where a criterion names the regressions
+  that discharge it, say so: a finding demanding a stronger property than a
+  named regression belongs under follow-ups, not `Fix First`. Prohibitions alone
+  bound the directions you already anticipated; ceilings bound the ones you did
+  not.
+- **Artifact versus aid.** Name what ships. Findings against CI guards, test
+  scaffolding, fixtures, and PR prose are worth less than findings against
+  shipped code, and saying so keeps review effort proportionate.
+- **What is already settled.** For a later round, list what prior rounds closed,
+  with run ids and head SHAs, so a fresh review does not relitigate it.
+
+For a repeat review, also state the round number and any declared shape of the
+change, such as a slice specified as net deletion. A reviewer told that a
+deletion has grown can weigh findings that reduce surface.
+
+Derive the prompt from the source document mechanically. Composing it freehand
+from memory of the contract reintroduces the paraphrase problem the file exists
+to prevent.
+
 Useful controls:
 
 ```bash
