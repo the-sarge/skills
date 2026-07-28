@@ -16,7 +16,7 @@ Do not ask the first grilling question until you have reconstructed the candidat
 3. Run the dossier helper from the repository root:
 
 ```bash
-python3 /Users/josh/.dotfiles/agents/.agents/skills/ras-grill-candidate/scripts/build_candidate_dossier.py --run-id <run-id> --candidate-id <candidate-id>
+python3 <skill-base-dir>/scripts/build_candidate_dossier.py --run-id <run-id> --candidate-id <candidate-id>
 ```
 
 4. Read the generated dossier before continuing. It must include the canonical synthesis block, candidate cluster, source candidates, evidence paths, architecture record notes, adjudication counts, dissent/corrections, source metadata, coverage notes, and warnings.
