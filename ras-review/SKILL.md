@@ -10,7 +10,7 @@ Use `ras review` when the user wants a multi-agent review synthesis for a GitHub
 
 ## Operating Model
 
-`ras review <pr-url-or-number>` prepares disposable review worktrees, runs the configured reviewer agents, adjudicates findings unless disabled, synthesizes a coding-agent-ready fix queue, stores artifacts in the RAS data directory, and prints the synthesis.
+`ras review <pr-url-or-number>` prepares disposable review worktrees, runs the configured reviewer agents, adjudicates findings unless disabled, synthesizes a proposed fix queue, stores artifacts in the RAS data directory, and prints the synthesis. Its classifications remain review evidence; they do not authorize edits or override the accepted work contract.
 
 It does not post to GitHub unless `--post` is passed or the user later runs `ras post <run-id>`.
 
@@ -18,7 +18,7 @@ It does not post to GitHub unless `--post` is passed or the user later runs `ras
 
 Use one-shot review as the default first move when a PR touches an approach-defining area and a likely finding could invalidate the implementation strategy. Examples include shell job control or process groups, concurrency/lifecycle orchestration, security/auth boundaries, migrations or data loss, parser or protocol changes, major dependency choices, and broad architecture/API shape changes.
 
-When the synthesis contains a critical or high finding that attacks the foundation, do not automatically route it into `ras review-fix` or ask a builder to preserve the design. Summarize the approach decision for the user: abandon or redesign, patch in place, or split follow-up work. Only start a mutating loop after the operator has chosen that direction.
+When the synthesis contains a critical or high finding that appears to attack the foundation, first validate it against the code and accepted work contract using the shared [finding-disposition policy](../_shared/REVIEW-LOOP.md). Do not automatically route it into `ras review-fix` or ask a builder to preserve the design. Use `stop-for-decision` only when the finding demonstrates that the accepted outcome cannot be completed safely inside its boundary; otherwise classify it as `fix-now`, `defer`, or `reject`.
 
 ## Before Running
 
@@ -117,6 +117,8 @@ Use `--no-adjudication` only when the user explicitly wants faster, less process
 
 Wait for the command to finish and read the final synthesis. Do not treat a quiet run or an exit code alone as a clean review.
 
+RAS severities, `Fix First`, `Do Not Act On`, required fixes, and verification commands are proposed classifications, not workflow commands. For a review-only request, report them without mutation. Before any later mutation, the implementing agent must inspect the cited code and apply the shared [finding-disposition policy](../_shared/REVIEW-LOOP.md). Do not perform sibling-family analysis or contract closure until a finding qualifies as `fix-now`.
+
 Separate agents may run other plain `ras review` commands against different PRs in the same repository while this review is running. RAS gives each review its own run id, run directory, and disposable worktrees, though very large parallel batches can still contend on shared SQLite and Git worktree locks.
 
 For this run, prefer the command's own output as the live progress source. Use `ras status`, `ras show`, `ras report`, or `ras serve` for explicit diagnostics or after the run completes rather than as a noisy polling loop. When an agent needs structured diagnostics, prefer `ras status <run-id> --json` or `ras show <run-id> --json` over scraping human-readable text.
@@ -127,22 +129,21 @@ When reporting back, include:
 - PR URL or number
 - whether the run posted to GitHub
 - synthesis judgment and `Fix First` count
+- when mutation or merge-readiness is in scope, the independent `fix-now`, `defer`, `reject`, and `stop-for-decision` dispositions with concise rationale
 - any command failures, missing quorum, or no-synthesis condition
 - where to inspect the run, such as `ras status <run-id> --json`, `ras show <run-id> --json`, `ras report <run-id>`, or `ras serve`
 
-Low/nit handling is a loop-control policy, not just a prioritization hint. When a synthesis contains only low-severity or nit findings, report it as having no blocking findings and do not route the PR into another RAS loop solely to validate polish.
+Apply the shared review loop's severity-independent low/nit policy when judging cleanliness or deciding whether another RAS cycle is warranted.
 
-If low/nit findings appear alongside blocking findings, cheap and local low/nit fixes may ride along only when a mutating fix/verify cycle is already required for blockers. If the only remaining findings are low/nit and any are not docs-only, do not fix them now, even if they look cheap; create or recommend follow-up issues and report them separately from blockers. If the only remaining findings are low/nit docs-only findings, they may be fixed only when the edit is cheap and correctness is very high confidence; after that docs-only polish fix, do not run another `ras review`, `ras verify`, or full RAS loop solely for the docs change. Run only lightweight local docs checks and state that the RAS re-run was intentionally skipped by policy.
+If independent disposition produces `stop-for-decision`, summarize the operator choice: abandon or redesign, patch in place with an expanded contract, or split follow-up work. Do not escalate merely because RAS used critical/high severity, and do not silently fix a valid but adjacent issue.
 
-If the synthesis contains foundational critical/high findings, summarize the operator choice first: abandon or redesign, patch in place, or split follow-up work. Only fix findings or route to `ras-review-loop` after the operator has chosen a direction.
-
-If the user asks to fix findings after a review, do not silently start a complete loop. Either fix the known patch-level synthesis as requested, respecting the low/nit policy above, or use `ras-review-loop` only when they ask for review/fix/verify iteration and the Approach Gate says the foundation is sound enough for mutation.
+If the user asks to fix findings after a review, do not silently start a complete loop. Independently disposition the findings, fix only the `fix-now` set as requested, and use `ras-review-loop` only when they ask for review/fix/verify iteration. Follow the shared automated-fixer safety policy.
 
 ## Safety Notes
 
 - Do not edit code for a review-only request.
 - Do not post unless the user asks for posting.
 - Do not hide failed reviewer, adjudication, or synthesis output.
-- Do not claim the PR is merge-ready just because `ras review` completed; the synthesis content determines that.
-- Treat low-severity and nit findings separately from true blockers when summarizing, and do not spend another RAS run on low/nit-only polish.
+- Do not claim the PR is merge-ready just because `ras review` completed; merge-readiness depends on independent disposition of the synthesis against the code and work contract.
+- Treat all review output as evidence, distinguish disposition from severity, and do not spend another RAS run on deferred or rejected polish.
 - Do not run cleanup/admin mutations such as `ras cleanup stale-runs --apply` while active reviews may still own the listed state.

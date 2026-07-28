@@ -15,14 +15,15 @@ Before planning, inspect any supplied issue. When given an OmniFocus task, use `
 
 - Write the plan, then present it to the user for approval **before writing any code**.
 - Implementation happens in a branch, divided into multiple PRs if needed, using TDD where appropriate.
+- Give each PR an explicit review contract: the outcome, acceptance criteria, existing behavior on the changed surface that must be preserved, non-goals, approved blast radius, and the tests or gates that terminate the work. Treat that contract as both the minimum to deliver and the ceiling a review finding cannot silently expand.
 - For each non-trivial design choice, state what it changes **beyond** the immediate goal — its blast radius (shared/global state, concurrency and ordering, public API and data/schema contracts, error and failure modes, performance, security surface, new dependencies, etc.) — and prefer the option with the smallest blast radius. Explicitly flag any choice whose full effects you haven't traced.
-- Apply the shared [contract-closure reference](../_shared/CONTRACT-CLOSURE.md) when a PR crosses one of its risk triggers. Include the precise invariant, enforcement owner, behaviorally distinct classes, dispositions, and proving tests in the plan; the plan is not approval-ready while a triggered row is untraced.
+- Apply the shared [contract-closure reference](../_shared/CONTRACT-CLOSURE.md) only to accepted obligations when a PR crosses one of its risk triggers. Bound the matrix by the review contract, and include the precise invariant, enforcement owner, behaviorally distinct in-contract classes, dispositions, and proportionate proving tests in the plan; the plan is not approval-ready while a required row is untraced.
 - Write the plan inline — concrete enough to execute: the PR breakdown and, within each PR, the specific changes and tests. Do not hand the plan off to another skill.
 
 ### 2. For each PR
 
 1. Implement the PR's work — use the `tdd` skill where appropriate — then push and open the PR.
-2. Run the review phase of the composed repository and shared protocols until a fresh review surfaces no blocking findings.
+2. Run the review phase of the composed repository and shared protocols until independent disposition of a fresh review leaves no `fix-now` or `stop-for-decision` findings.
 3. Run every planned stress gate, push the final candidate, and then run the repository's final local exact-head certification. If it exposes `task preflight`, run it and retain its exact head/base receipt; otherwise run and record the repository's documented local equivalents against the exact SHA. Any later candidate change invalidates this receipt and returns the PR to review before a new certification, except the shared protocol's docs-only polish exemption: run its lightweight docs checks and generate a new local certification without another RAS review.
 4. Request the required hosted CI for that same head, verify the run head and live PR head still match, and confirm the required result before merge. Do not blindly rerun a failed unchanged head: diagnose it first; fix repository failures and return to review, and allow a same-head rerun only for a demonstrated external infrastructure failure.
 5. Merge that exact head using the repository-required strategy. If `main` advances, update the branch and repeat review, local certification, and CI. If GitHub reports `mergeable: UNKNOWN` right after a push, poll until `MERGEABLE` before merging.
@@ -31,4 +32,4 @@ Before planning, inspect any supplied issue. When given an OmniFocus task, use `
 
 ### Approach stops
 
-Apply the shared [contract-closure reference](../_shared/CONTRACT-CLOSURE.md) before deciding whether a finding is local. When the composed review protocol reaches an approach stop, preserve the branch, record the review history and precise invariant-and-owner root, revise the plan using a complete closure proof, and present the changed approach for user approval before resuming code or RAS.
+Apply the shared review loop's finding-disposition policy before doing sibling-family or contract-closure work. A `defer` or `reject` finding does not revise the plan. When a finding is `stop-for-decision`, preserve the branch, record the disposition evidence and review history, revise the plan only as far as the accepted decision requires, and present the changed approach for user approval before resuming code or RAS.
