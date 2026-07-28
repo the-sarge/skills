@@ -1,14 +1,14 @@
 ---
 name: ras-review-loop
 description: >-
-  Use only when the user explicitly asks for a complete RAS review loop, such as "run the RAS review loop", "review-fix-verify-review", "iterate until the PR has no findings", or "keep reviewing and fixing until clean". Run the loop manually so the current agent independently dispositions and fixes findings. Do not use for single-step requests to only run `ras review`, fix known findings, run `ras verify`, or run a fresh review.
+  Use only when the user explicitly asks for a complete RAS review loop, such as "run the RAS review loop", "review-fix-verify-review", "complete the bounded review cycle", or "review and fix within the accepted review budget". Run the loop manually so the current agent independently dispositions and fixes findings. Do not use for single-step requests to only run `ras review`, fix known findings, run `ras verify`, or run a fresh review.
 ---
 
 # RAS Review Loop
 
 Drive an existing PR through the review phase of the shared [review-loop baseline](../_shared/REVIEW-LOOP.md), composed with any stronger repository review protocol. The current agent owns judgment and edits; RAS supplies review and verification evidence.
 
-This skill stops at review cleanliness. It does not merge the PR, run final certification or hosted CI, update trackers, append the development journal, or perform release cleanup.
+This skill stops when the shared bounded review algorithm finishes against the declared evidence plan and review-round budget. It does not merge the PR, run final certification or hosted CI, update trackers, append the development journal, or perform release cleanup.
 
 ## Before running
 

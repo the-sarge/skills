@@ -20,7 +20,7 @@ Use this skill as the router for broad RAS requests. RAS means review, adjudicat
 
 - Use `ras-inspect` for project status, run history, reports, artifacts, stale-run summaries, or `ras serve`.
 - Use `ras-review` for a one-shot GitHub PR review, posting a stored review, or an approach gate before mutating PR workflows.
-- Use `ras-review-loop` when the user explicitly asks for review, independent finding disposition, agent-performed fixes, verification, and repetition until clean.
+- Use `ras-review-loop` when the user explicitly asks for review, independent finding disposition, agent-performed fixes, verification, and completion against the declared evidence plan and review-round budget.
 - Use `ras-verify` for one-shot verification of a prior PR review or consideration run.
 - Use `ras-consider` for critique of a local PRD, design doc, implementation plan, or other repository file, especially when the next decision is whether a proposed approach is viable.
 - Use `ras-consider-resolve` for decision packets, document fixing, apply/resume/abort, or `ras fix <consider-run-id> --decisions <file>` after approach-defining decisions have been made.

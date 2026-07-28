@@ -29,3 +29,14 @@ Representation-aware, risk-gated, and evidence-budgeted contract closure landed 
 
 - Both standards and specification review axes were clean after their findings were fixed, and all 12 issue-defined forward scenarios passed.
 - Skill frontmatter, relative Markdown links, `git diff --check`, and `standardize-github-ci/scripts/test-skill.sh` passed at the final head.
+
+---
+
+## Correction: representation-aware contract-closure validation - 2026-07-28 15:43 EDT
+
+**Main:** `39c41b7a7b40`
+**Actor:** Codex
+
+### Correction
+
+The preceding entry's retained validation covers standards and specification review plus the listed static and fixture checks. No durable per-scenario receipt was kept for the 12 issue-defined forward scenarios, so its statement that all 12 passed is withdrawn.
