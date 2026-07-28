@@ -29,7 +29,7 @@ Use this pattern when the agent runs RAS or another review process before paid C
 5. By default, the agent captures the exact PR head and current default-branch tip, runs and resolves RAS outside GitHub, rechecks both live SHAs, dispatches CI on the same-repository PR branch, inspects the run and required check, rechecks the PR head/base, and merges with an exact-head guard. A new PR commit or default-branch advance invalidates the prior decision and CI result unless the repository explicitly documents and tests merge-base or merge-queue semantics.
 6. Keep complete default-branch validation until rulesets prohibit direct pushes; then consider reducing the post-merge run separately.
 
-The expected-SHA guard prevents accidental branch movement; it is not proof of RAS and must not be described as one in workflow state. Under the default trusted-agent/operator model, branch-local workflow code is acceptable. If the user explicitly requires protection from malicious same-repository branch writers, stop and separately design a trusted controller or dedicated check publisher rather than silently changing the architecture.
+The expected-SHA guard prevents accidental branch movement; it is not evidence that RAS ran or passed and must not be described as such in workflow state. Under the default trusted-agent/operator model, branch-local workflow code is acceptable. If the user explicitly requires protection from malicious same-repository branch writers, stop and separately design a trusted controller or dedicated check publisher rather than silently changing the architecture.
 
 Adapt this operator handoff to the repository's workflow and inputs:
 
@@ -45,7 +45,7 @@ When dispatch cannot satisfy the required PR rollup, adapt this one-shot label h
 gh pr edit <pr-number> --repo <owner/repository> --add-label <certification-label>
 ```
 
-The label and workflow must be generic CI coordination with no RAS meaning. The workflow must subscribe only to the `labeled` PR activity, reject unrelated labels, remove the certification label before checkout, and re-read the live PR to bind its head, base, repositories, and synthetic merge SHA to the event. Prove on live source and documentation PRs that open and synchronize start no run, the label is revoked, and the stable required check appears in the PR rollup.
+The label and workflow must be generic CI coordination with no RAS meaning. The workflow must subscribe only to the `labeled` PR activity, reject unrelated labels, remove the certification label before checkout, and re-read the live PR to bind its head, base, repositories, and synthetic merge SHA to the event. Demonstrate on one representative live source PR and one documentation PR that open and synchronize start no run, the label is revoked, and the stable required check appears in the PR rollup.
 
 Task is an optional agent interface, not a GitHub-side RAS gate. A target such as `task validate-pr PR=<n>` may capture the head, run RAS, inspect structured synthesis, recheck the live head, dispatch CI, inspect the run, and merge the same head, but must not request CI merely because `ras review` exited zero.
 

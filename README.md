@@ -21,8 +21,8 @@ _shared/            # protocol documents several skills compose
 
 | Document | Owns |
 | --- | --- |
-| `_shared/REVIEW-LOOP.md` | independent finding disposition, bounded finding-family classification, the approach-stop policy, and the manual review/fix/verify loop |
-| `_shared/CONTRACT-CLOSURE.md` | when an accepted boundary needs a proportionate closure matrix, and what counts as closing it without expanding the work contract |
+| `_shared/REVIEW-LOOP.md` | independent finding disposition, semantic finding-family classification, representation and repeated-root stops, and the bounded manual review/fix/verify loop |
+| `_shared/CONTRACT-CLOSURE.md` | representation-aware, artifact-aware, evidence-budgeted coverage arguments for materially risky accepted invariants |
 
 Repositories may overlay these with stronger rules of their own. An overlay adds
 and explicitly overrides; it does not restate.

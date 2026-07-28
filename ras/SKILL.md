@@ -34,9 +34,9 @@ Use this skill as the router for broad RAS requests. RAS means review, adjudicat
 
 Before choosing a mutating workflow, decide whether the implementation strategy is sufficiently specified. If not, route to read-only `ras-review` for PRs or `ras-consider` for plans first. In every case, treat review output as evidence and apply the shared [finding-disposition policy](../_shared/REVIEW-LOOP.md) before any review-driven mutation.
 
-Treat shell/process control, concurrency/lifecycle orchestration, auth/security boundaries, data migrations or destructive writes, parser/protocol rewrites, API or architecture changes, and unfamiliar dependency strategies as approach-risky by default. Use `ras-review-loop`, `ras-implement`, `ras-consider-resolve`, or `ras fix` after that gate only when the foundation is still sound and the remaining findings are patches on that foundation.
+Treat shell/process control, concurrency/lifecycle orchestration, auth/security boundaries, data migrations or destructive writes, parser/protocol rewrites, API or architecture changes, and unfamiliar dependency strategies as approach-risky by default. A handwritten scanner claiming broad coverage over an open external grammar without an authoritative parser, validator, or enforced canonical subset is an immediate design stop, not a syntax-patching loop. Use `ras-review-loop`, `ras-implement`, `ras-consider-resolve`, or `ras fix` after the gate only when the foundation is still sound and the remaining findings are patches on that foundation.
 
-If the user explicitly asks for a complete mutating loop, use the manual `ras-review-loop`, conservative loop caps, and its `fix-now`, `defer`, `reject`, and `stop-for-decision` policy. Severity alone does not establish a foundational stop.
+If the user explicitly asks for a complete mutating loop, use the manual `ras-review-loop`, its one-initial-plus-one-replacement review budget, and its `fix-now`, `defer`, `reject`, and `stop-for-decision` policy. Severity alone does not establish a foundational stop.
 
 ## Broad Status Pattern
 

@@ -12,6 +12,8 @@ Use these shapes after the slice graph passes the agent's evidence audit. Keep p
 **Track:** {n} of {N} in the {date} architecture deepening program
 **Depends on:** {track/slice, or "nothing — safe to start first"}
 **Related:** {settled ADRs and plans}
+**Normative scope:** Current outcome, boundaries, invariants, acceptance evidence, blockers, and stop conditions
+**Audit history:** {Links to review chronology, receipts, and superseded findings, or "none"}
 
 ## Goal
 
@@ -19,7 +21,7 @@ Use these shapes after the slice graph passes the agent's evidence audit. Keep p
 
 ## Current Shape (verified {date})
 
-{Verified facts with file:line anchors. State which original review claims did not survive grilling.}
+{Verified current facts with file:line anchors. Link historical corrections through the Audit history field instead of appending chronology here.}
 
 ## Decision
 
@@ -53,11 +55,17 @@ Use these shapes after the slice graph passes the agent's evidence audit. Keep p
 
 **Blast radius:** {Shared state, concurrency/ordering, interfaces/schema, failures, performance, security, dependencies. Explicitly flag untraced effects.}
 
-**Contract closure:** {For triggered protocol, lifecycle, multi-entrypoint, authority, environment, restoration, restart, concurrency, or security boundaries: invariant, enforcement owner, behaviorally distinct equivalence classes, dispositions, and proofs. Otherwise "not triggered" with evidence.}
+**Artifact classification:** {Classify each material artifact as shipped behavior, required safety enforcement, verification aid, or process/traceability metadata. For any verification aid approved as a blocking maintained deliverable, state payoff, supported domain, owner, and retirement policy.}
 
-**TDD and preservation proof:** {Tests written first and gates proving preserved behavior.}
+**Representation contract:** {Supported input domain; authoritative parser/validator or enforced canonical subset; representation owner; universal/canonical-subset/example-level guarantee.}
 
-**Fresh-context case:** {Why implementation, fixes, and verification fit one fresh context.}
+**Contract closure:** {If material consequence and multiple independently reachable paths/states both trigger closure: invariant, enforcement owner, behaviorally distinct semantic equivalence classes, dispositions, and terminating evidence. Otherwise "not triggered" with evidence.}
+
+**Evidence budget:** {Representative positive and materially distinct negative cases; optional one guard mutation per owner; justified platforms, repetitions, timing, hosted runs, or security-fixture cells; explicit terminating rule; one review plus at most one replacement.}
+
+**TDD and preservation evidence:** {Tests written first and focused gates detecting regressions in preserved behavior.}
+
+**Dispatch context budget:** {Current slice contract, referenced invariants, relevant unresolved history, governing diff if needed, and why implementation plus review fits one fresh context.}
 
 **Slice decision audit:** {Strongest further-split and adjacent-merge alternatives; why each was rejected; evidence that every blocking edge is necessary.}
 
@@ -66,11 +74,13 @@ Use these shapes after the slice graph passes the agent's evidence audit. Keep p
 ## Acceptance Criteria
 
 - [ ] {Checkable behavioral outcome.}
-- [ ] {Negative criterion proving an old seam or authority is absent where promised.}
+- [ ] {Negative criterion showing an old seam or authority is absent where promised.}
+
+For every criterion containing a universal quantifier, record its supported domain, representation owner, guarantee level, and finite terminating evidence.
 
 ## Validation Gates
 
-{Exact focused tests, full suite, task runner, and platform/race gates.}
+{Exact focused tests, full suite, task runner, and risk-justified platform/race gates within the evidence budget.}
 
 ## Operating Discipline
 
@@ -86,7 +96,7 @@ Follow `docs/REVIEW-LOOP.md` and `docs/CONTRACT-CLOSURE.md` for every slice/PR. 
 
 ## What this is
 
-{Origin and why plan docs are the source of truth.}
+{Stable program identity and why plan docs are the normative source of truth. Audit history stays behind links.}
 
 ## Outcomes that require no implementation
 
@@ -108,16 +118,16 @@ Follow `docs/REVIEW-LOOP.md` and `docs/CONTRACT-CLOSURE.md` for every slice/PR. 
 ## Parent track issue body
 
 ```markdown
-Implement only through the audited child slices in **`docs/adr/{date}-{track}-plan.md`**. The plan is the source of truth and contains the grilled design. Do not dispatch this parent issue as one implementation task. If a plan assumption proves wrong, use the child skill's scoped re-audit; check with the operator only when closure changes the accepted boundary.
+Implement only through the audited child slices in **`docs/adr/{date}-{track}-plan.md`**. The plan is the source of truth and contains the current grilled design. Do not dispatch this parent issue as one implementation task. If a plan assumption proves wrong, use the child skill's scoped re-audit only while the accepted representation, outcome, and one-PR boundary remain intact; otherwise stop for a decision or rebaseline.
 
 **Summary:** {Track outcome.}
 
-**Rejected direction:** {Restate the likely wrong turn, when applicable.}
-
 - Depends on: {parent/child issues or none}
 - Size: {n} audited child slices/PRs
+- Status: {current state}
 - Process: `docs/REVIEW-LOOP.md` for every child PR
 - Program index: `docs/adr/{date}-architecture-deepening-program.md`
+- Normative plan: `docs/adr/{date}-{track}-plan.md`
 
 ## Audited slices
 
@@ -136,33 +146,15 @@ Implement only through the audited child slices in **`docs/adr/{date}-{track}-pl
 
 - Parent: #{track issue}
 - Plan: `docs/adr/{date}-{track}-plan.md` — {slice heading}
+- Status: {ready/blocked/in progress/done}
 
-## What to build
-
-{The narrow end-to-end behavior this slice makes work. Do not restate a layer-by-layer recipe.}
-
-## Acceptance criteria
-
-- [ ] {Behavioral result.}
-- [ ] {Restart/failure/concurrency or negative criterion required by the slice.}
-- [ ] {Preservation gate.}
-
-## Ownership and transition budget
-
-- Single owner after merge: {owner}
-- Authority completeness: {constructors, validation, restart, and destructive/security consumers covered; or no new authoritative fact}
-- Temporary seams retained: {seams, why coherent, and removal issue; or none}
-- Blast radius: {traced effects and explicitly untraced effects}
-- Contract closure: {matrix location and precise invariant/enforcement owner, or not triggered with evidence}
-- Preservation proof: {gate for each contract intended to remain unchanged}
+The exact plan slice is the normative contract for outcome, acceptance criteria, ownership, representation, artifact classes, evidence and context budgets, preservation obligations, and stop conditions. Do not mirror those fields here.
 
 ## Blocked by
 
 - {Child issue links, or "None — can start immediately"}
 
-## Stop conditions
-
-{Evidence that invalidates the approach. Enter the scoped re-audit without widening the slice; consult the operator when closure changes topology, adjacent scope, product intent, irreversible authority, or the one-PR boundary.}
+Current blocker/frontier state is administrative metadata, not exact code-head certification.
 ```
 
 ## Tracking issue body
@@ -178,9 +170,9 @@ Program index: **`docs/adr/{date}-architecture-deepening-program.md`**.
 
 - [ ] #{parent} — {track} ({slice count} slices; {status/blocker})
 
-Already closed with no code: {rejections and ADRs}.
+Already closed with no code: {stable identity and plan pointers}.
 
-Binding rules: behavioral preservation; one mutation owner per durable fact; authority-complete slices; explicit transitional-seam removal; contract closure for triggered boundaries; `docs/REVIEW-LOOP.md` per PR.
+Binding rules: see the normative program index and track plans. This tracker contains current state and pointers only.
 ```
 
 ## OmniFocus note shapes
@@ -190,7 +182,9 @@ Track task note:
 ```text
 GitHub parent: {URL}
 Plan: docs/adr/{date}-{track}-plan.md
-{Summary}. {Dependency warning or "Independent."} {n} audited slices.
+Status: {current state}
+Dependencies: {warning or "Independent."}
+Slices: {n}
 ```
 
 Slice task note:
@@ -199,9 +193,8 @@ Slice task note:
 GitHub child: {URL}
 Parent: {URL}
 Dispatch: $implement-architecture-slice
-Plan commit: {exact 40-character docs commit SHA}
 Plan: docs/adr/{date}-{track}-plan.md#{slice-anchor}
-Delivers: {end-to-end outcome}
+Status: {ready/blocked/in progress/done}
 Blocked by: {issues or none}
 Per slice: review loop, merge, append-dev-journal, complete this task.
 ```

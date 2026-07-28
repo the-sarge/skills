@@ -5,17 +5,17 @@ description: 'Package grilled architecture-review candidates as dispatchable pro
 
 # Architecture Handoff
 
-Package a grilled architecture review so implementing agents never re-derive the design or decompose a multi-PR track themselves. Plan docs are the source of truth; each audited slice maps one-to-one to a child issue, intended PR, and OmniFocus task. Anything that lives only in conversation or a temporary report is a failure.
+Package a grilled architecture review so implementing agents never re-derive the design or decompose a multi-PR track themselves. Plan docs are the normative source of truth; each audited slice maps one-to-one to a child issue, intended PR, and pointer-based OmniFocus task. Anything that lives only in conversation or a temporary report is a failure.
 
 **Input**: an OmniFocus parent task link (`omnifocus:///task/...`). Ask if not given.
 
 **Precondition**: candidates have been grilled. If any have not, self-grill first: walk each design tree, explore the codebase, answer every technical question, and make the best evidence-backed decisions. Ask the user only when product intent, authority for an irreversible action, or mutually exclusive outcomes cannot be discovered from the code and accepted design. Never start implementation.
 
-**Order matters**: draft design docs, closure proofs, and slice graph → agent audits slice decisions → finalize docs → commit/push → issues → OmniFocus → report. Issues must reference committed docs. Do not publish or commit a dispatch plan before the slice audit passes.
+**Order matters**: draft current design docs, terminating evidence plans, and slice graph → agent audits slice decisions → finalize docs → commit/push → issues → OmniFocus → report. Issues must reference committed docs. Do not publish or commit a dispatch plan before the slice audit passes.
 
 **Scoped runs**: when the user names revised or additional tracks, update only those tracks plus the existing program overview, tracking issue, and OmniFocus parent. Do not recreate the program.
 
-**Existing work is not a baseline by default**: when a track has an open PR, implementation branch, failed review, or partial merge, fetch the issue and PR bodies/comments, inspect the diff and complete review history, and evaluate that work against the same slice gates. For repeated or approach-level findings, read and apply the shared [contract-closure reference](../_shared/CONTRACT-CLOSURE.md) to the precise invariant-and-owner root; do not extend the latest checklist. Never grandfather unmerged work as an "established baseline." If it violates a gate, choose and document rework, split, replacement, or closure; do not let later slices depend on it.
+**Existing work is not a baseline by default**: when a track has an open PR, implementation branch, failed review, or partial merge, fetch the issue and PR bodies/comments, inspect the diff and the history relevant to unresolved roots, and evaluate that work against the same slice gates. For repeated or approach-level findings, read and apply the shared [contract-closure reference](../_shared/CONTRACT-CLOSURE.md) to the precise invariant-and-owner root; do not extend the latest checklist. Never grandfather unmerged work as an "established baseline." If it violates a gate, choose and document rework, split, replacement, or closure; do not let later slices depend on it.
 
 ## Step 1 — Capture the grilled design
 
@@ -24,13 +24,14 @@ Draft one implementation-plan doc per track in `docs/adr/` using [TEMPLATES.md](
 - Grilled decisions with reasoning and verified facts anchored to `file:line`.
 - Reversed/rejected directions explicitly marked "do not do this."
 - Non-goals and settled ADRs/guardrails not to re-litigate.
-- Track dependencies, behavioral-preservation gates, approach-level stop conditions, and any contract-closure matrix required by the risk triggers below.
+- Track dependencies, behavioral-preservation gates, approach-level stop conditions, artifact classifications, representation contracts, evidence budgets, and any contract-closure matrix required by the risk triggers below.
 - The slice graph from Step 2; do not finalize or commit it before the agent audit passes.
 - The disposition of existing work: retain, re-slice, replace, or close, with evidence.
+- A context budget for each slice: the exact current slice contract, referenced invariants, relevant unresolved history, and bounded governing diff an implementer must receive.
 
-Also draft or update the program-overview doc and record any new domain terms or ADRs through the domain-modeling skill.
+Keep each plan normative and current: outcome, boundaries, invariants, acceptance evidence, blockers, and stop conditions only. Put review chronology, run IDs, historical candidate SHAs, verification receipts, and superseded findings in linked audit artifacts or PR discussion. Also draft or update the pointer-based program-overview doc and record any new domain terms or ADRs through the domain-modeling skill.
 
-Every plan's Operating Discipline section references `docs/REVIEW-LOOP.md`. If the repository lacks `docs/REVIEW-LOOP.md` or `docs/CONTRACT-CLOSURE.md`, seed the missing file from the shared [review-loop](../_shared/REVIEW-LOOP.md) or [contract-closure](../_shared/CONTRACT-CLOSURE.md) reference. When either exists, compare its semantic contract with the shared source and update stale portions without overwriting stronger repository-specific boundary, certification, CI, merge, journal, tracking, or routing rules. Verify the repository protocol covers finding-family closure, history-aware approach stops, exact-head local certification, same-head hosted CI, merge, journal, OmniFocus, and diagnosis before reruns.
+Every plan's Operating Discipline section references `docs/REVIEW-LOOP.md`. If the repository lacks `docs/REVIEW-LOOP.md` or `docs/CONTRACT-CLOSURE.md`, seed the missing file from the shared [review-loop](../_shared/REVIEW-LOOP.md) or [contract-closure](../_shared/CONTRACT-CLOSURE.md) reference. When either exists, compare its semantic contract with the shared source and update stale portions without overwriting stronger repository-specific boundary, certification, CI, merge, journal, tracking, or routing rules. Verify the repository protocol covers representation and artifact gates, finite evidence and review budgets, semantic-family closure, review-and-verification-aware approach stops, exact-head local certification, same-head hosted CI, merge, journal, pointer-based tracking, and diagnosis before reruns.
 
 ## Step 2 — Design and audit tracer-bullet slices
 
@@ -42,9 +43,9 @@ Every slice must satisfy all of these rules:
 
 - **Vertical and complete**: deliver one narrow behavior through the real module interface, persistence/adapter seams, callers, and tests that the behavior actually crosses. Do not create a horizontal "complete schema/model now, operations later" slice.
 - **Independently green**: merge without relying on an unmerged successor. State exactly how the slice is demonstrated or verified.
-- **Context-sized**: fit implementation, local review fixes, and verification in one fresh context window. Split again if that claim is doubtful.
+- **Context-sized**: declare a bounded dispatch context and fit implementation, local review fixes, and verification inside it. Split again if that claim is doubtful; never require two complete historical plan versions when the current slice plus a governing diff is sufficient.
 - **Explicitly ordered**: name only genuine blocking slices. A slice with no blockers belongs on the implementation frontier.
-- **TDD-shaped**: name the failing or characterization tests written first, including restart, failure, or concurrency tests where the behavior crosses those seams.
+- **TDD-shaped**: name the failing or characterization tests written first, including restart, failure, or concurrency tests where the behavior crosses those seams, and keep their count inside the declared evidence budget.
 - **Smallest blast radius**: trace effects beyond the immediate goal across shared/global state, concurrency and ordering, public interfaces and schemas, failure modes, performance, security, and dependencies. Flag every effect not fully traced.
 
 Apply these architecture-specific gates:
@@ -52,9 +53,14 @@ Apply these architecture-specific gates:
 - **Single-owner invariant**: after the slice, each durable fact and lifecycle transition has one mutation owner. A compatibility adapter may translate, but it must not become a second state machine.
 - **Authority-complete invariant**: do not make a persisted fact authoritative unless the same slice covers its constructors, validation, restart round trip, and every destructive or security-sensitive consumer that relies on it.
 - **Transitional-seam budget**: list every duplicate representation, generic mutation path, temporary adapter, or double-open lifetime left after the slice. Explain why the intermediate state is coherent and identify the exact blocking slice that removes it. A slice may not widen a transitional seam.
-- **Behavior-preservation proof**: distinguish unchanged behavior from intended architectural change and name the gate that proves each preserved contract. State each obligation as the regression it must detect, not as a deliverable to produce: "must fail if the commit write moves above the first barrier" is an obligation; "add single/batch two-barrier tests" is a deliverable that a partial implementation satisfies. If you cannot name the mutation an obligation catches, it is unfalsifiable and the slice is not ready to dispatch.
+- **Artifact classification**: classify every material artifact as shipped behavior, required safety enforcement, verification aid, or process/traceability metadata before assigning evidence. A verification aid may block shipped work only when the approved outcome makes it a maintained deliverable and records its operational payoff, supported domain, owner, and retirement policy.
+- **Behavior-preservation evidence**: distinguish unchanged behavior from intended architectural change and name the gate that detects each relevant regression. Use a guard-deletion or guard-bypass mutation only when it is the clearest discriminating evidence for a central owner, with at most one such mutation per owner by default. Do not recursively require closure for the test or harness.
 
-Apply [contract closure](../_shared/CONTRACT-CLOSURE.md) whenever a slice crosses a protocol or schema, lifecycle or ordering rule, multiple entrypoints or consumers, authority source, subprocess or inherited environment, cleanup or restoration boundary, restart behavior, concurrency boundary, or security-sensitive failure path. Record the invariant, enforcement owner, real axes, behaviorally distinct equivalence classes, dispositions, and proofs in the plan. The matrix must census current code and existing review history; a list of anticipated examples is not closure.
+Apply [contract closure](../_shared/CONTRACT-CLOSURE.md) only when an accepted invariant has both a material failure consequence and multiple independently reachable paths or states that ordinary focused tests cannot reasonably cover. Routine ordering, schema, or multiple-caller work defaults to focused tests unless material risk is established. Before closure, declare the supported input domain, trusted representation owner, universal/canonical-subset/example-level guarantee, and terminating evidence plan. A broad external-language guarantee requires an authoritative parser or validator or a mechanically enforced canonical subset; otherwise narrow the guarantee or return `stop-for-decision`. Record semantic equivalence classes rather than syntax aliases, and apply the shared mutation and operational evidence budgets.
+
+For every acceptance criterion containing “all,” “every,” “never,” “exactly,” or another universal claim, record the supported domain, representation owner, guarantee level, and finite evidence that terminates the slice. The plan is not dispatchable when the implementation cannot own that domain.
+
+For operational or platform evidence, use one representative positive and one materially distinct failure per semantic behavior and supported owner by default. Expand platforms only for material behavioral differences or an accepted support contract; require an explicit statistical question, prior instability, incident, SLO, or external certification for repeated runs; require a product or operational deadline for exact timing fixtures; and identify semantic versus redundant cells in platform or security matrices.
 
 Treat a genuinely wide mechanical refactor as expand–migrate–contract instead of forcing it into a tracer bullet. The expand step must be behaviorally inert and must not grant authority to the new form. Migrate in independently green batches sized by blast radius. Block contract/deletion on every migration batch. Use an integration branch only when no batch can remain green alone, and make the final integrate-and-verify slice explicit.
 
@@ -68,7 +74,9 @@ Before committing docs, write the proposed slice graph and audit each numbered s
 - Single owner after merge.
 - Temporary seams introduced or retained, and their removal slice.
 - Blast radius and untraced effects.
-- Why it fits one fresh context.
+- Artifact classes and any explicitly approved maintained verification aid.
+- Representation domain, owner, guarantee level, and terminating evidence budget.
+- Why it fits its declared fresh-context budget.
 - Existing-work disposition when applicable: retain, rework, split, replace, or close.
 - The strongest case for splitting it further and the strongest case for merging it with an adjacent slice.
 - The evidence that its blocking edges are necessary rather than convenient ordering.
@@ -77,26 +85,29 @@ Judge the graph yourself. Split when context fit, ownership, authority completen
 
 Do not ask the user to judge technical granularity, ownership seams, or dependency edges. Escalate only when the audit exposes an unresolved product choice, requires authority for an irreversible external action, or proves an accepted architectural decision cannot work. Otherwise make the best decision and proceed.
 
+### Legacy-program rebaseline
+
+When a scoped run updates a program created under older proof-oriented rules, use the rebaseline procedure in the shared contract-closure reference before designing new slices: freeze dispatch; classify obligations by artifact, accepted risk, and current necessity; preserve shipped behavior and required safety enforcement; disposition recursive, obsolete, duplicated, proof-only, or disproportionate obligations; move history behind links; collapse mirrors to current state and pointers; recompute the frontier; and publish one concise replacement contract plus a disposition ledger. Applying the procedure to that program requires the user's scoped handoff request; do not silently rebaseline unrelated tracks.
+
 ## Step 3 — Finalize and commit repo docs
 
-Finalize one plan per track plus the program overview using [TEMPLATES.md](TEMPLATES.md). The program overview records track order, slice-level blocking edges that cross tracks, parallel-safe frontiers, sizes, outcomes closed with no code, and binding rules.
+Finalize one current plan per track plus the program overview using [TEMPLATES.md](TEMPLATES.md). The program overview records stable track identity, plan pointers, slice-level blocking edges that cross tracks, parallel-safe frontiers, sizes, outcomes closed with no code, and binding rules. It does not mirror substantive slice contracts or audit history.
 
 Audit the docs, then commit and push them before creating issues. Use `pending` for issue-link fields that cannot exist yet; do not create another authoritative plan commit solely to backfill those links because the issues and program tracker own the live mapping.
 
 ## Step 4 — Publish GitHub issues
 
-Create one thin **parent track issue** per track. It points to the plan doc as source of truth, summarizes the track, names track-level dependencies, links the program index, restates reversed decisions, and lists its audited child slices. Do not dispatch the parent issue for implementation.
+Create one thin **parent track issue** per track. It points to the plan doc as source of truth and records stable identity, current state, track-level dependencies, the program index, and child pointers. Do not copy the contract or audit history into it, and do not dispatch the parent issue for implementation.
 
 Create or update exactly one **child issue per audited slice** using [TEMPLATES.md](TEMPLATES.md). Re-auditing existing work updates its existing child unless the audited disposition explicitly replaces or splits that contract:
 
 - Start with the stable `<!-- architecture-handoff-slice:v1 -->` marker, name `$implement-architecture-slice` as the dispatch skill, and record the exact 40-character docs commit containing the accepted plan.
 - Link the parent track issue and source plan.
-- Describe the end-to-end delivery and acceptance criteria, not a layer-by-layer implementation recipe.
+- Record stable slice identity and current state; keep the end-to-end delivery, acceptance criteria, representation contract, artifact classification, evidence budget, and stop conditions in the exact plan slice.
 - Record blocking child issues using native relationships when available, otherwise explicit links.
-- Restate the slice's owner, authority-completeness obligations, transitional-seam budget, blast radius, contract-closure obligation or not-triggered evidence, preservation proof with each obligation stated as the regression it must detect, and stop condition.
 - Apply the repo's agent-ready label only to frontier issues whose blockers are complete. Do not label blocked work ready.
 
-Then create or update one tracking issue for the program. It tracks parent issues, recommended order, blocked markers, and the current frontier; child details remain on the parent and in the plan.
+Then create or update one tracking issue for the program. It contains stable parent identities, blocked markers, the current frontier, and a program-index pointer. Child contracts and audit narratives remain in the plan and linked history.
 
 ## Step 5 — Mirror OmniFocus
 
@@ -104,15 +115,15 @@ Use the omnifocus-cli skill under the user's parent task:
 
 - Create one task per track and one subtask per child slice/intended PR. Include the child issue URL in each slice task.
 - Use `set-group-type --sequential` only for a genuinely linear track. Preserve parallel-safe work; do not invent ordering that is absent from the slice graph.
-- Prefix blocked slice titles with `BLOCKED by ...`; notes include the dispatch skill, plan commit, parent issue, child issue, plan path, delivery, and blockers.
-- Track notes include the parent issue, plan path, summary, dependency warnings, and slice count.
+- Prefix blocked slice titles with `BLOCKED by ...`; notes contain stable identity, current state, blockers, child and parent issue pointers, the dispatch skill, and the normative plan pointer. Do not copy the contract, audit narrative, or exact plan SHA into task-manager mirrors.
+- Track notes contain the parent issue and plan pointers, current state, dependency warnings, and slice count.
 - Update the program-parent note with the program index, tracking issue, current frontier, and per-slice ritual: review loop → merge → append-dev-journal → complete slice task.
 
 ## Step 6 — Report dispatch instructions
 
 Deliver the docs commit, tracking issue, all parent/child issue links, OmniFocus mapping, current frontier, and parallel-safe work.
 
-Dispatch each frontier child issue to a fresh agent with `$implement-architecture-slice`. That skill emits an execution preflight, implements the accepted contract, and performs same-child scoped re-audits without operator routing when closure remains inside the accepted one-PR boundary. It asks for `$architecture-handoff` only when closure changes topology, adjacent scope, product intent, irreversible authority, or the one-PR boundary. Clear context between child issues.
+Dispatch each frontier child issue to a fresh agent with `$implement-architecture-slice`. That skill emits an execution preflight, implements the accepted contract, and performs same-child scoped re-audits without operator routing only while the representation contract, accepted outcome, and one-PR boundary remain intact. It stops for a decision or asks for `$architecture-handoff` when representation ownership, topology, adjacent scope, product intent, irreversible authority, or the one-PR boundary changes. Clear context between child issues.
 
 ## Final audit
 
@@ -121,12 +132,16 @@ Before finishing, verify:
 - Every grilled decision appears in a committed plan.
 - Every audited slice maps exactly once to a plan contract, child issue, intended PR, and OmniFocus task.
 - Every child issue carries the stable marker, dispatch skill, and exact plan commit required by `$implement-architecture-slice`.
-- Every triggered contract-closure matrix maps its precise invariant, enforcement owner, behaviorally distinct classes, dispositions, and proofs into the committed plan and child contract.
+- Every material artifact is classified, and no verification aid blocks shipped behavior without explicit maintained-deliverable approval, payoff, domain, owner, and retirement policy.
+- Every universal criterion declares its supported domain, representation owner, guarantee level, and finite terminating evidence.
+- Every triggered contract-closure matrix maps its precise invariant, representation and enforcement owners, behaviorally distinct semantic classes, dispositions, and budgeted evidence into the committed plan.
 - Every unmerged existing slice was re-evaluated against the current gates; none was silently treated as an established dependency.
 - Every durable fact and transition has one named mutation owner after each slice.
 - Every newly authoritative persisted fact has constructor, validation, restart, and destructive-consumer coverage in the same slice.
 - Every transitional seam has a coherent intermediate contract and a blocking removal slice.
+- Every dispatchable slice has a bounded context budget, and audit history is linked rather than appended to its normative contract.
 - All blocking edges are genuine, all frontier labels are correct, and no blocked work is presented as ready.
+- Parent issues, program trackers, and OmniFocus notes contain current state and pointers rather than mirrored substantive contracts, and exact code-head certification is not conflated with administrative plan or mirror state.
 - No untraced blast-radius effect is silently accepted.
 
 If any check fails, return to the slice-design gate before publishing or dispatching work.

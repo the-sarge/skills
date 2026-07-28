@@ -54,7 +54,7 @@ GitHub must remain agnostic about RAS by default. Do not represent RAS invocatio
 
 The expected-SHA comparison is a race and ref-integrity guard, not an attestation that RAS passed. The default threat model trusts the agent/operator and same-repository branch writer who controls the PR, dispatch, verification, and exact-head merge. If malicious same-repository branch writers are explicitly in scope, design a trusted controller or dedicated check publisher as a separate security architecture and obtain approval for its credentials and settings; do not infer that stronger threat model merely because workflow code lives on the candidate branch.
 
-If live proof shows that GitHub excludes dispatch checks from the required PR rollup, use a generic CI mechanism that preserves the same trust boundary. A one-shot operator-only pull-request activity is admissible only when it carries no RAS meaning, revokes its trigger, binds the live head, base, and synthetic merge SHAs, and starts no run on open or synchronize.
+If live evidence shows that GitHub excludes dispatch checks from the required PR rollup, use a generic CI mechanism that preserves the same trust boundary. A one-shot operator-only pull-request activity is admissible only when it carries no RAS meaning, revokes its trigger, binds the live head, base, and synthetic merge SHAs, and starts no run on open or synchronize.
 
 An automatic preflight may remain when its early signal justifies its cost, but it must be cheap, must not launch the expensive certification graph, and must not emit or accidentally satisfy the required certification check. Do not use a skipped required job as a pending gate.
 
@@ -95,7 +95,7 @@ Do not place every possible check in the PR lane merely because one Taskfile tas
 | Protected default-branch push | Deployment or reduced smoke; do not repeat the identical full PR suite |
 | Direct default-branch push | Complete validation only when direct pushes are possible and intentionally supported |
 | Schedule | Time-sensitive security, deep race/integration, native platform, bounded fuzzing |
-| Manual dispatch | Agent-requested exact-head validation, exceptional diagnostics, proofs, or operator-selected deep work |
+| Manual dispatch | Agent-requested exact-head validation, exceptional diagnostics, bounded evidence, or operator-selected deep work |
 | Tag/release | Release validation and publication |
 
 Verify protection and merge behavior before dropping default-branch validation. If the workflow cannot distinguish protected PR merges from direct pushes reliably, keep a defensible default-branch gate or eliminate direct pushes through rulesets.
@@ -161,7 +161,7 @@ Do not skip secret scanning merely because a change is documentation-only; docum
 
 ### Caching and artifacts
 
-Cache immutable dependency downloads when repository policy permits it. Do not cache outputs whose clean deterministic rebuild is the assertion. Set explicit short artifact retention for disposable proof, corpus, or diagnostic artifacts.
+Cache immutable dependency downloads when repository policy permits it. Do not cache outputs whose clean deterministic rebuild is the assertion. Set explicit short artifact retention for disposable evidence, corpus, or diagnostic artifacts.
 
 ### Schedules
 

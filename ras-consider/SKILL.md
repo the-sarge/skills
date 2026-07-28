@@ -16,7 +16,7 @@ Consideration runs are local-only and do not post to GitHub. `ras verify <consid
 
 ## Approach Gate
 
-Use `ras consider` as the cheap design gate before a mutating loop when the artifact describes a possible approach rather than an accepted plan. If the synthesis says the foundation is wrong, ambiguous, or depends on an unresolved product/architecture choice, keep the decision with the user and revise the document; do not immediately feed it to `ras implement --from-run` or `ras-consider-resolve`.
+Use `ras consider` as the cheap design gate before a mutating loop when the artifact describes a possible approach rather than an accepted plan. If the synthesis says the foundation is wrong, ambiguous, claims broad coverage of an open external grammar through a handwritten scanner, or depends on an unresolved product/architecture choice, keep the decision with the user and revise the document; do not patch syntax examples or immediately feed the result to `ras implement --from-run` or `ras-consider-resolve`.
 
 ## Before Running
 
@@ -75,6 +75,8 @@ so a paraphrase that widens a bounded constraint produces findings that are
 correct against the paraphrase and wrong against the constraint. See the same
 guidance under `ras-review`, where the failure mode is best documented.
 
+For an engineering contract, also identify the supported representation domain and owner, universal/canonical-subset/example-level guarantee, artifact classes, terminating evidence plan, evidence budget, and whether the run is the initial consideration or the one allowed replacement. Ask reviewers to test semantic behavior and representation ownership inside that boundary. Do not generically request syntax aliases, concrete mutants, repeated hosted runs, exhaustive platform matrices, or recursive validation of verification aids.
+
 Useful controls:
 
 ```bash
@@ -99,7 +101,7 @@ When reporting back, include:
 - whether any agent, adjudication, or synthesis stage failed
 - where to inspect the run, such as `ras status <run-id> --json` or `ras show <run-id> --json` for agent-readable detail, and `ras report <run-id>` or `ras serve` for human browsing
 
-If the user asks to resolve findings in the document itself, apply the Approach Gate first. Only use `ras-consider-resolve` when the findings are document-level edits or the operator has chosen the approach; if the synthesis says the foundation is wrong or undecided, keep the decision with the user and revise the plan before invoking a fixer. If the user asks to turn the consideration output into code, use `ras-implement` with a precise work item or `ras implement --from-run <run-id>` only when the synthesis is suitable and the approach is chosen.
+If the user asks to resolve findings in the document itself, apply the Approach Gate first. Only use `ras-consider-resolve` when the findings are document-level edits or the operator has chosen the approach; if the synthesis says the foundation is wrong, representation ownership is missing, or direction is undecided, keep the decision with the user and revise the plan before invoking a fixer. If the user asks to turn the consideration output into code, use `ras-implement` with a precise work item or `ras implement --from-run <run-id>` only when the synthesis is suitable and the approach is chosen.
 
 ## Safety Notes
 
