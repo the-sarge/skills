@@ -84,7 +84,7 @@ For every criterion containing a universal quantifier, record its supported doma
 
 ## Operating Discipline
 
-Follow `docs/REVIEW-LOOP.md` and `docs/CONTRACT-CLOSURE.md` for every slice/PR. {Track-specific approach stop conditions and vocabulary reminders.}
+Follow the shared review-loop and contract-closure baselines supplied by `$implement-architecture-slice` for every slice/PR, composed with any existing repository-specific `docs/REVIEW-LOOP.md` and `docs/CONTRACT-CLOSURE.md` overlays. {Track-specific approach stop conditions and vocabulary reminders.}
 ```
 
 ## Program-overview doc skeleton
@@ -125,7 +125,7 @@ Implement only through the audited child slices in **`docs/adr/{date}-{track}-pl
 - Depends on: {parent/child issues or none}
 - Size: {n} audited child slices/PRs
 - Status: {current state}
-- Process: `docs/REVIEW-LOOP.md` for every child PR
+- Process: shared review-loop baseline plus any existing repository-specific `docs/REVIEW-LOOP.md` overlay for every child PR
 - Program index: `docs/adr/{date}-architecture-deepening-program.md`
 - Normative plan: `docs/adr/{date}-{track}-plan.md`
 
