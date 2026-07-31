@@ -15,7 +15,7 @@ Package a grilled architecture review so implementing agents never re-derive the
 
 **Scoped runs**: when the user names revised or additional tracks, update only those tracks plus the existing program overview, tracking issue, and OmniFocus parent. Do not recreate the program.
 
-**Existing work is not a baseline by default**: when a track has an open PR, implementation branch, failed review, or partial merge, fetch the issue and PR bodies/comments, inspect the diff and the history relevant to unresolved roots, and evaluate that work against the same slice gates. For repeated or approach-level findings, read and apply the shared [contract-closure reference](../_shared/CONTRACT-CLOSURE.md) to the precise invariant-and-owner root; do not extend the latest checklist. Never grandfather unmerged work as an "established baseline." If it violates a gate, choose and document rework, split, replacement, or closure; do not let later slices depend on it.
+**Existing work is not a baseline by default**: when a track has an open PR, implementation branch, failed review, or partial merge, fetch the issue and PR bodies/comments, inspect the diff and the history relevant to unresolved roots, and evaluate that work against the same slice gates. For repeated or approach-level findings, read and apply the shared [contract-closure reference](../_shared/CONTRACT-CLOSURE.md) to the precise invariant-and-owner root; do not extend the latest checklist. Before treating findings as one repeated root, record the required side-by-side comparison of their exact invariant, concrete central enforcement seam, semantic classes, and why the earlier accepted family had to cover the later case. A shared module, table, helper, lifecycle, or broad authority topic is not enough. Never grandfather unmerged work as an "established baseline." If it violates a gate, choose and document rework, split, replacement, or closure; do not let later slices depend on it.
 
 ## Step 1 — Capture the grilled design
 
@@ -135,6 +135,7 @@ Before finishing, verify:
 - Every material artifact is classified, and no verification aid blocks shipped behavior without explicit maintained-deliverable approval, payoff, domain, owner, and retirement policy.
 - Every universal criterion declares its supported domain, representation owner, guarantee level, and finite terminating evidence.
 - Every triggered contract-closure matrix maps its precise invariant, representation and enforcement owners, behaviorally distinct semantic classes, dispositions, and budgeted evidence into the committed plan.
+- Every repeated-root conclusion includes the shared side-by-side precise-root comparison; no conclusion relies only on a common module, table, helper, lifecycle, or broad architectural topic.
 - Every unmerged existing slice was re-evaluated against the current gates; none was silently treated as an established dependency.
 - Every durable fact and transition has one named mutation owner after each slice.
 - Every newly authoritative persisted fact has constructor, validation, restart, and destructive-consumer coverage in the same slice.

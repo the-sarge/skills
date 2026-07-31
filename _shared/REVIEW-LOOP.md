@@ -71,6 +71,8 @@ Stop immediately when a finding shows a handwritten scanner attempting to claim 
 
 Before fixing an accepted `fix-now` set or continuing verification, compare each precise invariant and enforcement owner with all prior review and verification evidence for the PR. Two behaviorally distinct semantic counterexamples at the same invariant and owner are sufficient to stop and reconsider the representation or enforcement seam, whether review or verification found them. Alternate syntax encodings of the same semantic case do not count as distinct counterexamples.
 
+Do not declare a repeated root until the side-by-side precise-root comparison in [contract closure](CONTRACT-CLOSURE.md#close-an-accepted-review-finding-as-a-family) names the exact invariant, concrete central enforcement seam, both semantic classes, and why the earlier accepted family had to cover the later case. A shared package, table, transaction helper, lifecycle, or broad authority concern is insufficient. If the comparison does not establish identity, do not trigger the automatic repeated-root stop; disposition the new finding independently and return any resulting `stop-for-decision` to the invoking workflow's decision branch.
+
 Also stop when a finding has the `stop-for-decision` disposition or when the accepted fixes collectively require widening the approved boundary. Preserve the branch, record dispositions, review and verification run IDs, representation contract, and causal pattern, and run no further fix/verify/review cycle. Return control to the invoking skill's decision branch; if none exists, check with the operator.
 
 ## Bounded review algorithm
@@ -79,9 +81,11 @@ Verification is scoped to the independently accepted findings from its source re
 
 After accepted findings from the initial review are verified, run at most one fully briefed replacement review. If that replacement finds a later new non-critical root, normally use `defer` or `stop-for-decision` rather than beginning another fix/verify/review cycle. Only a directly in-scope critical safety defect may override the review-round budget, and that override must be recorded explicitly.
 
+When the invoking workflow requires review and verification wrapper skills, those skills are mandatory. The operation names in the pseudocode below are conceptual, not permission to invoke the RAS CLI directly. If a required wrapper skill is unavailable, stop and report the missing dependency rather than falling back to `ras review` or `ras verify`.
+
 ```text
 bounded review:
-  ras review <pr> with the accepted contract and evidence budget
+  obtain a fresh review through the invoking workflow's required review skill
   independently disposition every substantive finding
   if any finding is stop-for-decision:
     STOP, preserve the branch, and return to the invoking skill's decision branch
@@ -100,7 +104,7 @@ bounded review:
     fix only the accepted in-contract semantic family at its enforcement owner
     run the accepted evidence plan
     push the branch update
-    ras verify <review-run-id> --head <exact 40-character SHA just pushed>
+    verify the source review through the invoking workflow's required verification skill at the exact pushed head
     independently disposition unresolved and new verification observations
     if a stop condition or repeated semantic root appears:
       STOP

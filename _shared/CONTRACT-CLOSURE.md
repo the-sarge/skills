@@ -98,6 +98,15 @@ Inspect the row and column containing the example inside the bounded contract. A
 
 Classify repeated roots by the precise invariant and enforcement owner, not by a broad noun such as “schema,” “ordering,” or “authority.” Two behaviorally distinct semantic counterexamples at the same invariant and owner indicate an approach failure; alternate encodings of one semantic case do not create distinct roots.
 
+Before declaring a repeated root, write a side-by-side comparison that names:
+
+- The exact accepted invariant each counterexample violates.
+- The concrete central enforcement seam that owns both cases, such as one validator, reducer, transaction-owned operation, or guard—not merely a shared package, table, lifecycle topic, or helper.
+- The behaviorally distinct semantic class represented by each counterexample.
+- Why the accepted family and earlier central fix were required to cover the later case.
+
+If that comparison requires broadening the invariant or owner to make the findings match, they are not the same precise root for automatic-stop purposes. Different caller names do not make roots distinct when one accepted central guard explicitly owns both, but sharing a module, table, transaction helper, or architectural concern does not make roots identical. Disposition a nonmatching finding on its own merits.
+
 ## Re-audit a failed approach
 
 Use the relevant review and verification history to rebuild the coverage argument rather than extending the latest example list:
