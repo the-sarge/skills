@@ -28,7 +28,7 @@ Everything in Library, plus a single-job, tag-push-triggered publisher:
 - Trigger: push of an annotated `v*` tag (the tag push is the deliberate operator act; no dispatch ceremony). `workflow_dispatch` on an existing tag allowed as a retry path.
 - Flow: verify tag format and default-branch ancestry → run the repo's release gate → cross-build the supported targets → archive as `<name>_<version>_<os>_<arch>.tar.gz` → `SHA256SUMS` → `gh release create --verify-tag`, failing if the release exists.
 - Notes from CHANGELOG or a tracked notes file, stating platform tiers (invariant 7).
-- **Reference implementation: `the-sarge/ras` `.github/workflows/release.yml` + `docs/release.md`** (adapt module path, binary name, target matrix). Its Homebrew-tap-from-checksums flow is an optional add-on.
+- **Reference implementation: `SwarmCast/tapmux` `.github/workflows/release.yml` + `docs/runbooks/release.md`** — the proven baseline (first verified release v2.0.0-rc.3). Adapt module path, binary name, target list, and gate decomposition: private-module deploy keys must be scoped to the steps that need them (gate fixtures may require their absence), and aggregate local gate tasks usually decompose into separate CI steps. `the-sarge/ras` contributed the original design and its Homebrew-tap-from-checksums flow remains the optional distribution add-on, but its publisher has never executed — verify it before treating it as reference.
 - Prefer draft-create → spot-check → publish for the *first* release of a new major line; steady-state releases publish directly.
 
 ### Hardened (opt-in only, security-critical repos)
@@ -51,7 +51,7 @@ For repos whose artifacts are themselves security infrastructure (today: cpace o
 | GridSwarm/codemux | Library | Compliant (manual) |
 | GridSwarm/keymux | Library | No code yet; adopt at first release |
 | GridCastIO/gridcast | Binary | No publisher |
-| SwarmCast/tapmux | Binary | In progress — v2.0.0 program, issue SwarmCast/tapmux#428 |
+| SwarmCast/tapmux | Binary | Compliant (reference for Binary tier): publisher proven with v2.0.0-rc.3 (2026-08-05); v2.0.0 final pending readiness gates in SwarmCast/tapmux#428. Adoption lessons: keys must be step-scoped or gate fixtures break; aggregate local gate tasks must be decomposed in CI |
 | SwarmCast/swarmcast | Binary | Validation-only `release-check`; no publisher |
 | GrainBin/wellspring | Library | Manual releases; verify invariants on next release |
 | GrainBin/offload | Binary | No publisher |
