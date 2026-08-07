@@ -16,7 +16,7 @@ This shared baseline owns finding disposition, finding-family classification, pr
 5. Request required hosted CI for that same head and verify its protected result belongs to the certified head.
 6. Merge that exact head.
 7. **Only after that merge is on the default branch**, run `append-dev-journal` without RAS. **NEVER start `append-dev-journal` before the main work has merged.**
-8. Update OmniFocus: complete the relevant task and add review follow-ups.
+8. Revalidate every pending `defer` against the merged head, then update OmniFocus: complete the relevant task and file the surviving follow-ups. See [deferred-finding revalidation](#deferred-finding-revalidation).
 
 ## Review loop
 
@@ -117,7 +117,20 @@ bounded review:
     done
 ```
 
-Verification may continue to list `defer` or `reject` findings as open because no code was changed for them. That is expected. Do not hide those results or reclassify an item merely to advance the loop; carry forward the recorded disposition and rationale, and reconsider it only when new code or contract evidence changes the judgment.
+Verification may continue to list `defer` or `reject` findings as open because no code was changed for them. That is expected. Do not hide those results or reclassify an item merely to advance the loop; carry forward the recorded disposition and rationale, and reconsider it only when new code or contract evidence changes the judgment. Fixes landed later in the same PR are exactly that kind of new code evidence: before a deferred finding becomes a tracked follow-up, revalidate it against the merged head per [deferred-finding revalidation](#deferred-finding-revalidation).
+
+## Deferred-finding revalidation
+
+A `defer` is dispositioned mid-loop but filed after merge. Fixes for other findings land in between, so a deferred finding can be silently resolved by the very PR that deferred it. A squash merge also makes the review head unreachable from the merged history, so a follow-up that cites only that head cannot be checked later.
+
+Before filing any deferred finding as a tracked follow-up:
+
+- Re-check the claim against the **merged** commit, not the head that produced it. Read the code at the cited location.
+- Drop it silently if the merge already resolved it. This is not reclassifying to advance the loop — the loop is over.
+- Record the merged SHA it was validated against and the current `file:line`. Never cite only the review run ID or the review head.
+- If the cited symbol, file, or seam no longer exists, say so in the follow-up instead of restating the original finding text.
+
+This applies to every deferred finding, including ones a verification run still lists as open, and to findings produced by an exact-head verification that later commits superseded.
 
 ## Exact-head local certification and hosted CI
 
