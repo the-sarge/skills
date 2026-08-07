@@ -15,7 +15,7 @@ This shared baseline owns finding disposition, finding-family classification, pr
 4. Push the final candidate, run slice-specific stress checks, and run the repository's local exact-head certification.
 5. Request required hosted CI for that same head and verify its protected result belongs to the certified head.
 6. Merge that exact head.
-7. Run `append-dev-journal` without RAS.
+7. **Only after that merge is on the default branch**, run `append-dev-journal` without RAS. **NEVER start `append-dev-journal` before the main work has merged.**
 8. Update OmniFocus: complete the relevant task and add review follow-ups.
 
 ## Review loop

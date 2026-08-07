@@ -10,6 +10,16 @@ session, milestone, release, handoff, decision batch, or other meaningful
 project boundary. The skill works in any git repository and no longer assumes a
 specific organization, repo map, session prefix, or counter scheme.
 
+## Hard precondition
+
+**NEVER start this skill until AFTER the main work has merged.**
+
+When invoked from planit, review-loop, architecture-slice, or any PR-driven
+workflow, the product PR (or other primary deliverable) must already be merged
+to the default branch. Do not draft, preview, append, open a journal PR, or
+commit journal updates while the main PR is still open, waiting on CI, or only
+locally certified. Journal is post-merge only.
+
 ## Default Entry Shape
 
 New generic entries use:
@@ -110,6 +120,8 @@ The script:
 
 ## Procedure
 
+0. Confirm the main work is already merged to the default branch (see Hard
+   precondition). If it is not, stop and do not run this skill.
 1. Gather enough evidence to write a factual entry. Use `git status --short`,
    recent `git log`, relevant diffs, PR/issue state, validation output, and user
    notes as appropriate.
@@ -139,6 +151,8 @@ The script:
 
 Stop without appending if:
 
+- the main product work for this journal entry has not yet merged to the
+  default branch (hard precondition);
 - the current directory is not inside a git repo;
 - the target journal path would be outside the repo;
 - both `DEV-JOURNAL.md` and `docs/DEV-JOURNAL.md` exist and the user did not
