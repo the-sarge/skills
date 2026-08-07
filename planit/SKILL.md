@@ -30,7 +30,7 @@ Before planning, inspect any supplied issue. When given an OmniFocus task, use `
 4. Request the required hosted CI for that same head, verify the run head and live PR head still match, and confirm the required result before merge. Do not blindly rerun a failed unchanged head: diagnose it first; fix repository failures and return to review, and allow a same-head rerun only for a demonstrated external infrastructure failure.
 5. Merge that exact head using the repository-required strategy. If `main` advances, update the branch and repeat review, local certification, and CI. If GitHub reports `mergeable: UNKNOWN` right after a push, poll until `MERGEABLE` before merging.
 6. **Only after step 5 has completed and the main work is on the default branch**, append a dev-journal entry with the `append-dev-journal` skill — **do NOT run `ras` for the journal**. **NEVER start `append-dev-journal` before the main work has merged.** Do not open the next product PR while this PR's journal is still in flight if that would put the next PR behind a journal merge.
-7. Update OmniFocus with the `omnifocus-cli` skill — complete the relevant task and add any follow-up issues created during review.
+7. Revalidate every pending `defer` against the merged head per the shared [deferred-finding revalidation](../_shared/REVIEW-LOOP.md#deferred-finding-revalidation) rule, filing only the survivors. Then update OmniFocus with the `omnifocus-cli` skill — complete the relevant task and add those follow-ups.
 
 ### Approach stops
 

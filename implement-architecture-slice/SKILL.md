@@ -94,7 +94,7 @@ This step is complete only when the exact reviewed, locally certified, and hoste
 
 ## 5. Close the program loop
 
-**Only after step 4 has merged the main work to the default branch**, run `append-dev-journal` without RAS. **NEVER start `append-dev-journal` before the main work has merged.** Ensure the child issue is closed, create review follow-up issues, and use `omnifocus-cli` to complete the exact slice task and add those follow-ups.
+**Only after step 4 has merged the main work to the default branch**, run `append-dev-journal` without RAS. **NEVER start `append-dev-journal` before the main work has merged.** Ensure the child issue is closed, then revalidate every pending `defer` against that merged head per the shared [deferred-finding revalidation](../_shared/REVIEW-LOOP.md#deferred-finding-revalidation) rule — drop the ones this PR already resolved, and cite the merged SHA plus current `file:line` on the rest. Create review follow-up issues only for the survivors, and use `omnifocus-cli` to complete the exact slice task and add those follow-ups.
 
 Recompute only the affected successors. When all of a successor's blockers are closed, apply the repository's agent-ready label, remove its OmniFocus blocked prefix, and refresh the tracking issue and program-parent current frontier without inventing ordering. Keep those updates to current state, blockers, and pointers; do not copy contracts, audit history, or exact plan-SHA narratives into mirrors.
 
