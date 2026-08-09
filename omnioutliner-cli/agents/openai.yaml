@@ -1,0 +1,4 @@
+interface:
+  display_name: "OmniOutliner CLI"
+  short_description: "Inspect and edit OmniOutliner outlines"
+  default_prompt: "Use $omnioutliner-cli to inspect, export, or safely modify OmniOutliner outlines through the local CLI."
