@@ -46,11 +46,12 @@ For repos whose artifacts are themselves security infrastructure (today: cpace o
 | Repo | Tier | Status (2026-08-05) |
 |---|---|---|
 | the-sarge/cpace | Hardened | Compliant (reference) |
+| the-sarge/ai-cli | Binary | Compliant: first verified release v0.2.0-rc.1 published 2026-08-09; publisher ran green, all 13 assets independently downloaded, 12 checksums passed, and all six arm64 binaries reported the exact tagged commit |
 | the-sarge/ras | Binary | Publisher designed, never run — needs first verified release |
 | GridSwarm/wiremux | Binary | Publishing works; over-spec relative to policy; simplify opportunistically, don't rewrite |
 | GridSwarm/codemux | Library | Compliant (manual) |
 | GridSwarm/keymux | Library | No code yet; adopt at first release |
-| GridCastIO/gridcast | Binary | No publisher |
+| GridCastIO/gridcast | Binary | Compliant: first verified release v0.1.0 published 2026-08-08 (publisher green on first real run; RD5 four-cell clean-install matrix passed against the exact draft assets; evidence on GridCastIO/gridcast#279) |
 | SwarmCast/tapmux | Binary | Compliant (reference for Binary tier): publisher proven with v2.0.0-rc.3 (2026-08-05); v2.0.0 final pending readiness gates in SwarmCast/tapmux#428. Adoption lessons: keys must be step-scoped or gate fixtures break; aggregate local gate tasks must be decomposed in CI |
 | SwarmCast/swarmcast | Binary | Validation-only `release-check`; no publisher |
 | GrainBin/wellspring | Library | Manual releases; verify invariants on next release |
