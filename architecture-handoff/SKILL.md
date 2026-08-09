@@ -11,7 +11,7 @@ Package a grilled architecture review so implementing agents never re-derive the
 
 **Precondition**: candidates have been grilled. If any have not, self-grill first: walk each design tree, explore the codebase, answer every technical question, and make the best evidence-backed decisions. Ask the user only when product intent, authority for an irreversible action, or mutually exclusive outcomes cannot be discovered from the code and accepted design. Never start implementation.
 
-**Order matters**: draft current design docs, terminating evidence plans, and slice graph → agent audits slice decisions → finalize docs → commit/push → issues → OmniFocus → report. Issues must reference committed docs. Do not publish or commit a dispatch plan before the slice audit passes.
+**Order matters**: draft current design docs, terminating evidence plans, and slice graph → agent audits slice decisions → finalize docs → publish and merge docs → resolve the exact default-branch plan commit → issues → OmniFocus → report. Issues must reference docs already merged to the default branch. Do not publish or commit a dispatch plan before the slice audit passes, and do not synchronize dispatch pointers or report a slice ready while its accepted contract exists only on an unmerged branch.
 
 **Scoped runs**: when the user names revised or additional tracks, update only those tracks plus the existing program overview, tracking issue, and OmniFocus parent. Do not recreate the program.
 
@@ -89,11 +89,15 @@ Do not ask the user to judge technical granularity, ownership seams, or dependen
 
 When a scoped run updates a program created under older proof-oriented rules, execute the [shared legacy-program rebaseline](../_shared/CONTRACT-CLOSURE.md#keep-contracts-and-tracking-bounded) before designing new slices. Applying it to that program requires the user's scoped handoff request; do not silently rebaseline unrelated tracks.
 
-## Step 3 — Finalize and commit repo docs
+## Step 3 — Finalize, publish, and merge repo docs
 
 Finalize one current plan per track plus the program overview using [TEMPLATES.md](TEMPLATES.md). The program overview records stable track identity, plan pointers, slice-level blocking edges that cross tracks, parallel-safe frontiers, sizes, outcomes closed with no code, and binding rules. It does not mirror substantive slice contracts or audit history.
 
-Audit the docs, then commit and push them before creating issues. Use `pending` for issue-link fields that cannot exist yet; do not create another authoritative plan commit solely to backfill those links because the issues and program tracker own the live mapping.
+Audit the docs, then commit and push them on a dedicated branch. Publish and merge that branch through the repository's authorized docs path before creating or updating issues and task-manager mirrors. Satisfy the repository's required review, validation, hosted-CI, and merge gates for docs; do not substitute an unmerged branch, open PR, or successful branch check for default-branch publication.
+
+After the merge, fetch the default branch and identify the exact 40-character commit whose tree contains the accepted plan. Verify that the commit is reachable from the current remote default branch and that the plan and program-index contents there match the audited contract. For a squash merge, record the resulting default-branch squash commit rather than the unreachable source-branch commit. For a merge or rebase strategy, still verify reachability instead of assuming it. This verified default-branch commit is the plan commit used by child issues and dispatch reporting.
+
+Use `pending` for issue-link fields that cannot exist before publication; do not create another authoritative plan commit solely to backfill those links because the issues and program tracker own the live mapping. If the docs cannot be merged or the accepted contract cannot be verified on the default branch, stop before synchronizing issue pointers, readiness labels, or OmniFocus state and report that the handoff is not dispatchable.
 
 ## Step 4 — Publish GitHub issues
 
@@ -101,7 +105,7 @@ Create one thin **parent track issue** per track. It points to the plan doc as s
 
 Create or update exactly one **child issue per audited slice** using [TEMPLATES.md](TEMPLATES.md). Re-auditing existing work updates its existing child unless the audited disposition explicitly replaces or splits that contract:
 
-- Start with the stable `<!-- architecture-handoff-slice:v1 -->` marker, name `$implement-architecture-slice` as the dispatch skill, and record the exact 40-character docs commit containing the accepted plan.
+- Start with the stable `<!-- architecture-handoff-slice:v1 -->` marker, name `$implement-architecture-slice` as the dispatch skill, and record the exact 40-character default-branch commit from Step 3 containing the accepted plan. Never record an unmerged source-branch commit.
 - Link the parent track issue and source plan.
 - Record stable slice identity and current state; keep the end-to-end delivery, acceptance criteria, representation contract, artifact classification, evidence budget, and stop conditions in the exact plan slice.
 - Record blocking child issues using native relationships when available, otherwise explicit links.
@@ -121,17 +125,17 @@ Use the omnifocus-cli skill under the user's parent task:
 
 ## Step 6 — Report dispatch instructions
 
-Deliver the docs commit, tracking issue, all parent/child issue links, OmniFocus mapping, current frontier, and parallel-safe work.
+Deliver the merged default-branch plan commit, docs PR and merge receipt, tracking issue, all parent/child issue links, OmniFocus mapping, current frontier, and parallel-safe work.
 
-Dispatch each frontier child issue to a fresh agent with `$implement-architecture-slice`. That skill emits an execution preflight, implements the accepted contract, and performs same-child scoped re-audits without operator routing only while the representation contract, accepted outcome, and one-PR boundary remain intact. It stops for a decision or asks for `$architecture-handoff` when representation ownership, topology, adjacent scope, product intent, irreversible authority, or the one-PR boundary changes. Clear context between child issues.
+Immediately before reporting dispatch instructions, fetch the remote default branch again and verify that every frontier child's recorded plan commit remains reachable and its exact plan slice is present there. Dispatch each verified frontier child issue to a fresh agent with `$implement-architecture-slice`. That skill emits an execution preflight, implements the accepted contract, and performs same-child scoped re-audits without operator routing only while the representation contract, accepted outcome, and one-PR boundary remain intact. It stops for a decision or asks for `$architecture-handoff` when representation ownership, topology, adjacent scope, product intent, irreversible authority, or the one-PR boundary changes. Clear context between child issues. A child whose plan commit is not reachable from the current remote default branch is not dispatchable even if its branch was pushed or its docs PR is open.
 
 ## Final audit
 
 Before finishing, verify:
 
-- Every grilled decision appears in a committed plan.
+- Every grilled decision appears in a plan merged to the current remote default branch.
 - Every audited slice maps exactly once to a plan contract, child issue, intended PR, and OmniFocus task.
-- Every child issue carries the stable marker, dispatch skill, and exact plan commit required by `$implement-architecture-slice`.
+- Every child issue carries the stable marker, dispatch skill, and exact default-branch plan commit required by `$implement-architecture-slice`; that commit is reachable from the current remote default branch and contains the accepted slice contract.
 - Every material artifact is classified, and no verification aid blocks shipped behavior without explicit maintained-deliverable approval, payoff, domain, owner, and retirement policy.
 - Every universal criterion declares its supported domain, representation owner, guarantee level, and finite terminating evidence.
 - Every triggered contract-closure matrix maps its precise invariant, representation and enforcement owners, behaviorally distinct semantic classes, dispositions, and budgeted evidence into the committed plan.

@@ -140,7 +140,7 @@ Implement only through the audited child slices in **`docs/adr/{date}-{track}-pl
 <!-- architecture-handoff-slice:v1 -->
 
 **Dispatch:** `$implement-architecture-slice`
-**Plan commit:** `{exact 40-character docs commit SHA}`
+**Plan commit:** `{exact 40-character default-branch commit SHA containing the accepted plan}`
 
 ## Parent and source of truth
 
