@@ -9,7 +9,7 @@ Package a grilled architecture review so implementing agents never re-derive the
 
 **Input**: an OmniFocus parent task link (`omnifocus:///task/...`). Ask if not given.
 
-**Precondition**: candidates have been grilled. If any have not, self-grill first: walk each design tree, explore the codebase, answer every technical question, and make the best evidence-backed decisions. Ask the user only when product intent, authority for an irreversible action, or mutually exclusive outcomes cannot be discovered from the code and accepted design. Never start implementation.
+**Precondition**: candidates have been grilled. If any have not, self-grill first: walk each design tree, explore the codebase, answer every technical question, and make the best evidence-backed decisions. Ask the user only when product intent, authority for an irreversible action, or mutually exclusive outcomes cannot be discovered from the code and accepted design. Never start implementation or launch an implementation agent at any step of this skill — including Step 6. This skill's output is a package and a report; dispatch is the operator's decision.
 
 **Order matters**: draft current design docs, terminating evidence plans, and slice graph → agent audits slice decisions → finalize docs → publish and merge docs → resolve the exact default-branch plan commit → issues → OmniFocus → report. Issues must reference docs already merged to the default branch. Do not publish or commit a dispatch plan before the slice audit passes, and do not synchronize dispatch pointers or report a slice ready while its accepted contract exists only on an unmerged branch.
 
@@ -123,11 +123,15 @@ Use the omnifocus-cli skill under the user's parent task:
 - Track notes contain the parent issue and plan pointers, current state, dependency warnings, and slice count.
 - Update the program-parent note with the program index, tracking issue, current frontier, and per-slice ritual: review loop → merge → append-dev-journal → complete slice task.
 
-## Step 6 — Report dispatch instructions
+## Step 6 — Report; do not dispatch
 
-Deliver the merged default-branch plan commit, docs PR and merge receipt, tracking issue, all parent/child issue links, OmniFocus mapping, current frontier, and parallel-safe work.
+This run's terminal action is the report below. Do not launch `$implement-architecture-slice` or any implementation agent for any child, including a verified frontier child. Every sentence in this step that mentions dispatching is text you deliver to the operator, not an action you take.
 
-Immediately before reporting dispatch instructions, fetch the remote default branch again and verify that every frontier child's recorded plan commit remains reachable and its exact plan slice is present there. Dispatch each verified frontier child issue to a fresh agent with `$implement-architecture-slice`. That skill emits an execution preflight, implements the accepted contract, and performs same-child scoped re-audits without operator routing only while the representation contract, accepted outcome, and one-PR boundary remain intact. It stops for a decision or asks for `$architecture-handoff` when representation ownership, topology, adjacent scope, product intent, irreversible authority, or the one-PR boundary changes. Clear context between child issues. A child whose plan commit is not reachable from the current remote default branch is not dispatchable even if its branch was pushed or its docs PR is open.
+Immediately before writing the report, fetch the remote default branch again and verify that every frontier child's recorded plan commit remains reachable and its exact plan slice is present there. A child whose plan commit is not reachable from the current remote default branch must be reported as not dispatchable even if its branch was pushed or its docs PR is open.
+
+Deliver: the merged default-branch plan commit, docs PR and merge receipt, tracking issue, all parent/child issue links, OmniFocus mapping, current frontier, parallel-safe work, and these standing instructions for the operator to use when they choose to dispatch:
+
+> Dispatch each verified frontier child issue to a fresh agent with `$implement-architecture-slice`. That skill emits an execution preflight, implements the accepted contract, and performs same-child scoped re-audits without operator routing only while the representation contract, accepted outcome, and one-PR boundary remain intact. It stops for a decision or asks for `$architecture-handoff` when representation ownership, topology, adjacent scope, product intent, irreversible authority, or the one-PR boundary changes. Clear context between child issues.
 
 ## Final audit
 
@@ -148,5 +152,6 @@ Before finishing, verify:
 - All blocking edges are genuine, all frontier labels are correct, and no blocked work is presented as ready.
 - Parent issues, program trackers, and OmniFocus notes contain current state and pointers rather than mirrored substantive contracts, and exact code-head certification is not conflated with administrative plan or mirror state.
 - No untraced blast-radius effect is silently accepted.
+- This run launched no implementation or dispatch agent; the frontier is reported as dispatchable, not dispatched.
 
 If any check fails, return to the slice-design gate before publishing or dispatching work.
