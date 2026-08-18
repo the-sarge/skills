@@ -13,7 +13,7 @@ This shared baseline owns finding disposition, finding-family classification, pr
 2. Independently disposition every substantive finding, fix and verify only accepted `fix-now` findings, and permit at most one fresh replacement review after those fixes.
 3. Finish when the terminating evidence plan and review budget are satisfied with no unresolved `stop-for-decision` finding. Do not make reviewer exhaustion a completion criterion.
 4. Push the final candidate, run slice-specific stress checks, and run the repository's local exact-head certification.
-5. Mark the PR ready (`gh pr ready`) so the required `ci-*` jobs run on that same head, then wait for a post-ready `ci` run on the live head to complete with `success` (a draft-phase `skipped` check is not evidence).
+5. Mark the PR ready (`gh pr ready`) so the required `ci-*` jobs run on that same head, then wait until a `ci` run triggered by `ready_for_review` (or a later `synchronize`) on the live head has completed with conclusion `success` and every required `ci-*` check reports a real success — a draft-phase `skipped` check is never merge evidence; see [hosted CI](#exact-head-local-certification-and-hosted-ci).
 6. Merge that exact head with `gh pr merge --squash --match-head-commit <head>`.
 7. **Only after that merge is on the default branch**, run `append-dev-journal` without RAS. **NEVER start `append-dev-journal` before the main work has merged.**
 8. Revalidate every pending `defer` against the merged head, then update OmniFocus: complete the relevant task and file the surviving follow-ups. See [deferred-finding revalidation](#deferred-finding-revalidation).
