@@ -1,0 +1,45 @@
+# Merge these tasks into the repository's Taskfile.yml. `ci` is the only
+# target .github/workflows/ci.yml calls. `docs-check` and `check` are
+# repository-owned; replace their bodies. Add one `ci-<lane>` task per
+# additional required job (see `ci-race`); delete it if unused.
+version: '3'
+
+vars:
+  # Space-separated shell globs treated as documentation by scripts/ci-classify.sh.
+  CI_DOCS_GLOBS: '*.md docs/* DEV-JOURNAL.md LICENSE LICENSE.*'
+
+tasks:
+  ci:
+    desc: Required merge gate; docs-only changes run docs-check, everything else runs check
+    cmds:
+      - |
+        result="$(CI_DOCS_GLOBS='{{.CI_DOCS_GLOBS}}' scripts/ci-classify.sh)"
+        case "$result" in
+          docs_only=true) task docs-check ;;
+          *) task check ;;
+        esac
+
+  ci-race:
+    desc: Example additional required lane; skips work for docs-only changes but still reports success
+    cmds:
+      - |
+        result="$(CI_DOCS_GLOBS='{{.CI_DOCS_GLOBS}}' scripts/ci-classify.sh)"
+        case "$result" in
+          docs_only=true) echo "docs-only change; race lane not applicable" ;;
+          *) task race ;;
+        esac
+
+  docs-check:
+    desc: Documentation checks (repository-owned)
+    cmds:
+      - echo "replace with the repository's documentation checks"
+
+  check:
+    desc: Ordinary merge gate (repository-owned)
+    cmds:
+      - echo "replace with the repository's format, vet, lint, test, and build checks"
+
+  race:
+    desc: Race lane body (repository-owned; only if ci-race is used)
+    cmds:
+      - echo "replace with the repository's race tests"
