@@ -518,6 +518,11 @@ if rg -qi 'dispatch|exact-head' "$skill_root/agents/openai.yaml"; then
   fail 'openai.yaml: stale description'
 fi
 
+rg -Fq 'skipped' "$policy" || fail 'ci-policy.md: must state the skipped-check mechanism'
+rg -Fq 'ready_for_review' "$migration" || fail 'migration.md: must describe the ready_for_review run'
+rg -Fq 'gh pr ready' "$skill_md" || fail 'SKILL.md: must describe marking the PR ready'
+rg -Fq 'short_description: "Audit and apply the draft-gated pull_request CI standard"' "$skill_root/agents/openai.yaml" || fail 'openai.yaml: short_description must match'
+
 # New test sections belong above this line, under their own `# ---` marker;
 # nothing may follow `completed=1` but the success line.
 completed=1

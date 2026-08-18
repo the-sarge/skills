@@ -9,7 +9,7 @@ Converge one repository at a time onto the standard in [references/ci-policy.md]
 
 ## Trust and review boundary
 
-GitHub carries no review-tool state. The agent opens PRs as drafts, reviews out of band, marks the PR ready when local certification passes, waits for the required `ci-*` checks on the live head, and merges that head with a squash. Draft status is the only signal and means "not ready for CI".
+GitHub carries no review-tool state. The agent opens PRs as drafts, reviews out of band, marks the PR ready (`gh pr ready`) when local certification passes, waits for a `ci` run triggered after the PR was marked ready to succeed on the live head (a draft-phase `skipped` check is never merge evidence), and merges that head with a squash. Draft status is the only signal and means "not ready for CI".
 
 ## Choose the mode
 
@@ -58,7 +58,7 @@ Proceed only when the user explicitly asks to implement or has approved the plan
 
 ## Validate
 
-1. `scripts/audit-ci.sh .` on the branch reports no deviations other than `RULES-*` before the ruleset is applied, and none after.
+1. Run `scripts/audit-ci.sh .` and expect `- None. Repository conforms to the standard.`; then run `CI_AUDIT_RULESET=live scripts/audit-ci.sh .` and expect only `RULES-*` deviations before the ruleset is applied and none after.
 2. `actionlint .github/workflows/ci.yml` passes; every edited YAML parses.
 3. `task ci` runs locally on a docs-only diff and on a source diff and takes the expected path.
 4. The live-PR observations in migration §7 are performed and recorded in the PR description.

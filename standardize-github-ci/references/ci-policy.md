@@ -36,7 +36,7 @@ Every repository has `.github/workflows/ci.yml` copied from [`assets/ci.yml`](..
 - Permissions: `contents: read` at workflow level and nothing else unless a Taskfile target demonstrably needs more.
 - Every job: `if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}`, `timeout-minutes`, third-party actions pinned to full commit SHAs, `actions/checkout` with `fetch-depth: 0` so `scripts/ci-classify.sh` can compute a merge base.
 
-Why the draft guard is safe: GitHub refuses to merge a draft PR regardless of checks, so a draft's skipped `ci-required` can never satisfy the ruleset. The moment the PR is marked ready, `ready_for_review` starts a real run on the live head; every later push starts another. The required check therefore only ever exists as a real run on a non-draft head.
+Why drafts are safe, and what they are not: the job-level `if` skips the job on draft PRs, but GitHub still publishes a `ci-required` check run with conclusion `skipped` and counts `skipped` as passing for required checks. That is harmless while the PR is a draft, because GitHub refuses to merge drafts regardless of checks. The moment the PR is marked ready, `ready_for_review` starts a real run on the live head and its check run supersedes the skipped one; every later push starts another. The agent convention therefore never treats a `skipped` conclusion as evidence: it merges only after a `ci` workflow run triggered by `ready_for_review` (or by a `synchronize` after ready) on the exact live head has completed with conclusion `success` — see [Agent convention](#agent-convention).
 
 ## Required jobs
 
@@ -84,7 +84,7 @@ GitHub carries no review-tool state. There are no labels, inputs, statuses, comm
 
 ## Agent convention
 
-The shared [review loop](../../_shared/REVIEW-LOOP.md#exact-head-local-certification-and-hosted-ci) owns the sequence: open the PR as a draft; review and certify locally; `gh pr ready`; wait for every required `ci-*` check to succeed on the live head; `gh pr merge --squash --match-head-commit <head>`.
+The shared [review loop](../../_shared/REVIEW-LOOP.md#exact-head-local-certification-and-hosted-ci) owns the sequence: open the PR as a draft; review and certify locally; `gh pr ready`; wait until a `ci` run triggered by `ready_for_review` or a later `synchronize` on the live head has completed with conclusion `success` (`gh run list --workflow ci.yml --commit <head> --json event,status,conclusion`), never accepting a `skipped` conclusion left over from the draft phase; `gh pr merge --squash --match-head-commit <head>`.
 
 ## What the standard forbids
 

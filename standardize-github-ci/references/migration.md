@@ -19,7 +19,7 @@ Produce, per repository: the mapping from old jobs to `ci-required` / `ci-<lane>
 2. Copy `assets/ci-classify.sh` to `scripts/ci-classify.sh` unchanged and make it executable.
 3. Merge `assets/Taskfile.ci.yml` into `Taskfile.yml`: add `ci`, `docs-check`, `check`, and one `ci-<lane>` per extra job; point `check` and `docs-check` at the repository's existing commands.
 4. Remove `pull_request` and `pull_request_target` from every other workflow; delete workflows that only existed to certify PRs (dispatch/label/status-bridge workflows). Keep deep, security, fuzz, cross-platform, and release workflows on their non-PR triggers, pinned and with timeouts.
-5. Run `task ci` locally on the branch (expect the docs-only or full path as appropriate) and `scripts/audit-ci.sh .` (expect `- None. Repository conforms to the standard.` apart from `RULES-*`, which is checked live).
+5. Run `task ci` locally on the branch (expect the docs-only or full path as appropriate); run `scripts/audit-ci.sh .` and expect `- None. Repository conforms to the standard.`; then run `CI_AUDIT_RULESET=live scripts/audit-ci.sh .` and expect only `RULES-*` deviations before the ruleset is applied and none after.
 6. Commit. Do not open the PR yet.
 
 ## 4. Bootstrap warning
@@ -33,7 +33,7 @@ git push -u origin <branch>
 gh pr create --draft --title "ci: adopt portfolio CI standard" --body "<summary of the mapping>"
 ```
 
-While the PR is a draft, no `ci.yml` job runs on it (the new workflow file is on the branch, but the guard skips drafts; the old default-branch workflow may still run, see §4).
+While the PR is a draft, `ci.yml` runs but every `ci-*` job is skipped by the draft guard (the check shows `skipped`; a draft cannot be merged regardless). The old default-branch workflow may still run, see §4.
 
 ## 6. Apply the ruleset (external mutation, needs explicit authorization)
 
@@ -46,12 +46,13 @@ Until the migration PR merges, the *old* required check names may still be refer
 
 ## 7. Verify on the migration PR (this is the live test of GitHub behavior)
 
-1. Draft: `gh pr view --json mergeable,mergeStateStatus` shows the PR is not mergeable while draft, and `gh run list --workflow ci.yml --branch <branch>` shows no run from the new workflow.
-2. `gh pr ready`. Expect a `ci` run whose head SHA equals `gh pr view --json headRefOid`. Expect every `ci-*` check to appear in `gh pr checks`.
+1. Draft: `gh pr view --json isDraft,mergeable` shows draft; `gh run list --workflow ci.yml --branch <branch> --json event,conclusion` shows the run(s) with every `ci-*` job skipped (`gh run view <id> --json jobs`), and the PR cannot be merged.
+2. `gh pr ready`. Expect a new `ci` run with `event: ready_for_review` whose head SHA equals `gh pr view --json headRefOid`, in which every `ci-*` job actually executes and succeeds. Expect every `ci-*` check in `gh pr checks` to show a real (non-skipped) success.
 3. Push a docs-only commit (for example a line in `DEV-JOURNAL.md` or `docs/`). Expect the run's `ci-required` log to show `task docs-check` ran and no `task check`.
 4. Push a source commit. Expect `task check` to run.
 5. If possible, land an unrelated change on the default branch and confirm `gh pr view --json mergeStateStatus` becomes `BEHIND` and the merge button is blocked until `gh pr update-branch` (or a rebase) re-runs CI.
 6. Confirm the merge is blocked while any `ci-*` check is pending or failed.
+7. Confirm the merge rule end to end: immediately after `gh pr ready` and before the new run completes, `gh pr checks` may still show the draft-phase `skipped` check — record that this is not accepted as merge evidence; merge only after the `ready_for_review` run reports `success`.
 
 Record head SHAs, run ids, and check names for each observation in the PR description.
 

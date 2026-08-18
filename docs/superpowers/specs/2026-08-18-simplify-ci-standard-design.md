@@ -60,7 +60,7 @@ jobs:
 Rules:
 
 - Trigger is exactly `pull_request` with `types: [opened, synchronize, reopened, ready_for_review]`. No `push`, no `workflow_dispatch`, no `pull_request_target`, no `paths` filters.
-- The job-level `if` skips draft PRs and PRs whose head repository is not the base repository. A skipped job on a draft PR is harmless because GitHub refuses to merge drafts; the required check therefore only ever exists as a real run on a non-draft head.
+- The job-level `if` skips draft PRs and PRs whose head repository is not the base repository. A skipped job on a draft PR still publishes a `skipped` check (which GitHub counts as passing), but drafts cannot be merged; after `gh pr ready` a real run supersedes it, and the agent convention merges only on a completed `success` run triggered after ready — never on a `skipped` conclusion.
 - Concurrency cancels superseded runs per PR.
 - `permissions` is `contents: read` at workflow level; jobs add nothing unless a Taskfile target demonstrably needs it.
 - Every job has `timeout-minutes`.
@@ -119,7 +119,7 @@ GitHub carries no review-tool state. There are no labels, inputs, statuses, comm
 1. Open every PR as a draft.
 2. Run the RAS review loop and local exact-head certification as today; no hosted CI runs during this phase.
 3. When local certification passes on the live head, mark the PR ready (`gh pr ready`).
-4. Wait for every required `ci-*` check to succeed on the live head. A push after ready re-runs CI on the new head; that is expected. If the default branch advances, GitHub blocks the merge until the branch is updated, which re-runs CI.
+4. Wait until a `ci` run triggered by `ready_for_review` (or a later `synchronize`) on the live head has completed with conclusion `success`; a `skipped` conclusion left from the draft phase is not evidence. A push after ready re-runs CI on the new head; that is expected. If the default branch advances, GitHub blocks the merge until the branch is updated, which re-runs CI.
 5. Merge with `gh pr merge --squash --match-head-commit <head>`.
 6. Journal and tracking steps are unchanged.
 
