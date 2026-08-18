@@ -104,6 +104,8 @@ else
       || deviate CI-PIN "ci.yml: job $job has a step that is not a mapping; every step must be a run step or a SHA-pinned uses step"
     while IFS= read -r uses; do
       test -n "$uses" || continue
+      # Local composite actions and docker:// images carry no ref to pin.
+      case "$uses" in ./*|docker://*) continue ;; esac
       printf '%s' "$uses" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(/[A-Za-z0-9_./-]+)?@[0-9a-f]{40}$' \
         || deviate CI-PIN "ci.yml: job $job uses unpinned action $uses"
     done <<< "$(printf '%s' "$stepsjson" | jq -r '.[] | select(type=="object" and has("uses")) | .uses' 2>/dev/null || true)"
@@ -147,6 +149,8 @@ if test -d "$workflow_dir"; then
     fi
     while IFS= read -r uses; do
       test -n "$uses" || continue
+      # Local composite actions and docker:// images carry no ref to pin.
+      case "$uses" in ./*|docker://*) continue ;; esac
       printf '%s' "$uses" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(/[A-Za-z0-9_./-]+)?@[0-9a-f]{40}$' \
         || deviate WF-PIN "$rel: unpinned action $uses"
     done <<< "$(printf '%s' "$ojobs" | jq -r '.[] | (if type=="object" then (.steps? // []) else [] end) | (if type=="array" then . else [] end) | .[] | select(type=="object" and has("uses")) | .uses' 2>/dev/null || true)"
@@ -259,7 +263,7 @@ if test "$rules_configured" -eq 1; then
     # CI-MISSING already covers this; comparing against no jobs would only add noise.
     printf -- '- Required contexts (from rulesets only): expected unknown (ci.yml missing or unparseable), actual `%s`\n' "$actual_contexts"
   else
-    expected_contexts="$(printf '%s\n' "$job_names" | { grep -E '^ci-' || true; } | sort | jq -R . | jq -sc .)"
+    expected_contexts="$(printf '%s\n' "$job_names" | { grep -E '^ci-' || true; } | LC_ALL=C sort | jq -R . | jq -sc .)"
     printf -- '- Required contexts (from rulesets only): expected `%s`, actual `%s`\n' "$expected_contexts" "$actual_contexts"
     test "$expected_contexts" = "$actual_contexts" || deviate RULES-CHECKS "default branch: required status checks must be exactly the ci-* jobs $expected_contexts (actual $actual_contexts)"
   fi

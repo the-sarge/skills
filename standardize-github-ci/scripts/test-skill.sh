@@ -317,6 +317,36 @@ git -C "$other" add . && git -C "$other" commit -qm target
 run_audit "$other"; out="$audit_out"
 expect_deviation "$out" WF-PR-TRIGGER
 
+# local composite actions and docker:// images carry no ref to pin and must not be flagged
+localact="$tmp/localaction"
+make_conformant_repo "$localact"
+yq -i '.jobs["ci-required"].steps += [{"uses":"./.github/actions/setup"},{"uses":"docker://alpine:3.20"}]' "$localact/.github/workflows/ci.yml"
+cat > "$localact/.github/workflows/nightly.yml" <<'YAML'
+name: nightly
+on:
+  schedule:
+    - cron: '23 4 * * *'
+jobs:
+  deep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: ./.github/actions/setup
+      - run: task deep
+YAML
+run_audit "$localact"; out="$audit_out"
+test "$audit_rc" -eq 0 || fail "audit: local composite actions must not be reported as unpinned; got $audit_rc:
+$out"
+
+# an unpinned third-party action beside them still fires, in ci.yml and elsewhere
+yq -i '.jobs["ci-required"].steps += [{"uses":"actions/setup-node@v4"}]' "$localact/.github/workflows/ci.yml"
+yq -i '.jobs.deep.steps += [{"uses":"actions/setup-node@v4"}]' "$localact/.github/workflows/nightly.yml"
+run_audit "$localact"; out="$audit_out"
+test "$audit_rc" -eq 3 || fail "audit: unpinned third-party action must exit 3; got $audit_rc:
+$out"
+expect_deviation "$out" CI-PIN
+expect_deviation "$out" WF-PIN
+
 # Taskfile and classifier presence
 tf="$tmp/taskfile"
 make_conformant_repo "$tf"
