@@ -114,6 +114,12 @@ git -C "$cls_repo" add . && git -C "$cls_repo" commit -qm docs
 docs_commit="$(git -C "$cls_repo" rev-parse HEAD)"
 test "$(classify_in CI_DEFAULT_BRANCH=main)" = 'docs_only=true' || fail 'classifier: markdown, docs/**, DEV-JOURNAL.md must be docs_only=true'
 
+# default-branch fallback order: CI_DEFAULT_BRANCH, then GITHUB_BASE_REF, then the
+# origin/HEAD probe, then main. This fixture has no remote, so the probe is empty.
+test "$(classify_in GITHUB_BASE_REF=main)" = 'docs_only=true' || fail 'classifier: GITHUB_BASE_REF must supply the default branch'
+test "$(classify_in GITHUB_BASE_REF=does-not-exist)" = 'docs_only=false' || fail 'classifier: GITHUB_BASE_REF must be consulted before the origin/HEAD probe and the main fallback'
+test "$(classify_in CI_DEFAULT_BRANCH=does-not-exist GITHUB_BASE_REF=main)" = 'docs_only=false' || fail 'classifier: CI_DEFAULT_BRANCH must win over GITHUB_BASE_REF'
+
 # unknown extension outside docs/ -> not docs
 printf 'x\n' > "$cls_repo/notes.txt"
 git -C "$cls_repo" add . && git -C "$cls_repo" commit -qm txt

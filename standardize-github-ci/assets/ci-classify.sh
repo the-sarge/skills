@@ -6,7 +6,8 @@
 # Env:
 #   CI_BASE_SHA        explicit base commit (default: merge-base with the default branch)
 #   CI_HEAD_SHA        head commit (default: HEAD)
-#   CI_DEFAULT_BRANCH  default branch name (default: origin/HEAD target, else main)
+#   CI_DEFAULT_BRANCH  default branch name (default: GITHUB_BASE_REF, else the origin/HEAD
+#                      target, else main)
 #   CI_REMOTE          remote name (default: origin)
 #   CI_DOCS_GLOBS      space-separated shell globs treated as documentation
 #                      (default: '*.md docs/* DEV-JOURNAL.md LICENSE LICENSE.*')
@@ -25,7 +26,7 @@ emit() {
   exit 0
 }
 
-default_branch="${CI_DEFAULT_BRANCH:-}"
+default_branch="${CI_DEFAULT_BRANCH:-${GITHUB_BASE_REF:-}}"
 if test -z "$default_branch"; then
   default_branch="$(git symbolic-ref -q --short "refs/remotes/$remote/HEAD" 2>/dev/null | sed "s#^$remote/##" || true)"
   default_branch="${default_branch:-main}"
