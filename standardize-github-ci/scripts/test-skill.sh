@@ -82,6 +82,7 @@ printf 'more\n' >> "$cls_repo/README.md"
 mkdir -p "$cls_repo/docs/deep" && printf 'note\n' > "$cls_repo/docs/deep/notes.txt"
 printf 'entry\n' > "$cls_repo/DEV-JOURNAL.md"
 git -C "$cls_repo" add . && git -C "$cls_repo" commit -qm docs
+docs_commit="$(git -C "$cls_repo" rev-parse HEAD)"
 test "$(classify_in CI_DEFAULT_BRANCH=main)" = 'docs_only=true' || fail 'classifier: markdown, docs/**, DEV-JOURNAL.md must be docs_only=true'
 
 # unknown extension outside docs/ -> not docs
@@ -91,14 +92,15 @@ test "$(classify_in CI_DEFAULT_BRANCH=main)" = 'docs_only=false' || fail 'classi
 # allowlist extension via CI_DOCS_GLOBS
 test "$(classify_in CI_DEFAULT_BRANCH=main CI_DOCS_GLOBS='*.md docs/* DEV-JOURNAL.md *.txt')" = 'docs_only=true' || fail 'classifier: CI_DOCS_GLOBS must extend the allowlist'
 
-# source change -> not docs
+# source change -> not docs (fresh branch off main so the diff contains only the .go change)
+git -C "$cls_repo" checkout -q main
+git -C "$cls_repo" checkout -qb src-branch
 printf 'var Changed = true\n' >> "$cls_repo/pkg/pkg.go"
 git -C "$cls_repo" add . && git -C "$cls_repo" commit -qm source
 test "$(classify_in CI_DEFAULT_BRANCH=main)" = 'docs_only=false' || fail 'classifier: source change must be docs_only=false'
 
 # explicit base wins
-docs_head="$(git -C "$cls_repo" rev-parse HEAD~2)"
-test "$(classify_in CI_DEFAULT_BRANCH=main CI_HEAD_SHA="$docs_head" CI_BASE_SHA=main)" = 'docs_only=true' || fail 'classifier: CI_BASE_SHA/CI_HEAD_SHA must be honoured'
+test "$(classify_in CI_DEFAULT_BRANCH=main CI_HEAD_SHA="$docs_commit" CI_BASE_SHA=main)" = 'docs_only=true' || fail 'classifier: CI_BASE_SHA/CI_HEAD_SHA must be honoured'
 
 # missing base -> fail closed, still exit 0
 test "$(classify_in CI_DEFAULT_BRANCH=does-not-exist)" = 'docs_only=false' || fail 'classifier: unknown base must be docs_only=false'
@@ -110,13 +112,13 @@ gh_out="$tmp/github-output"
 (cd "$cls_repo" && GITHUB_OUTPUT="$gh_out" CI_DEFAULT_BRANCH=main "$classify" >/dev/null 2>&1)
 test "$(cat "$gh_out")" = 'docs_only=false' || fail 'classifier: GITHUB_OUTPUT mirror'
 
-# no globbing against the working tree: a file literally named '*.md' must not widen the match
+# no globbing against the working tree: without set -f, docs/* would pathname-expand to the
+# existing docs/nested directory and no longer match docs/nested/only.txt, yielding false
 git -C "$cls_repo" checkout -q main
 git -C "$cls_repo" checkout -qb glob-branch
-printf 'x\n' > "$cls_repo/pkg/other.go"
-touch "$cls_repo/*.md"
+mkdir -p "$cls_repo/docs/nested" && printf 'note\n' > "$cls_repo/docs/nested/only.txt"
 git -C "$cls_repo" add . && git -C "$cls_repo" commit -qm glob
-test "$(classify_in CI_DEFAULT_BRANCH=main)" = 'docs_only=false' || fail 'classifier: must not pathname-expand globs'
+test "$(classify_in CI_DEFAULT_BRANCH=main)" = 'docs_only=true' || fail 'classifier: must not pathname-expand globs'
 
 # --- audit
 
