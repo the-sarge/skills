@@ -488,6 +488,15 @@ $out"
 
 # --- docs
 
+policy="$skill_root/references/ci-policy.md"
+rg -Fq 'types: [opened, synchronize, reopened, ready_for_review]' "$policy" || fail 'ci-policy.md: must state the trigger'
+rg -Fq 'ci-<lane>' "$policy" || fail 'ci-policy.md: must define ci-<lane> jobs'
+rg -Fq 'strict' "$policy" || fail 'ci-policy.md: must require strict up-to-date'
+rg -Fq 'squash' "$policy" || fail 'ci-policy.md: must require squash-only'
+if rg -qi 'expected_sha|status bridge|ci:certify|ci-certify|workflow_dispatch.*certif|labeled' "$policy"; then
+  fail 'ci-policy.md: must not describe dispatch/label certification'
+fi
+
 # New test sections belong above this line, under their own `# ---` marker;
 # nothing may follow `completed=1` but the success line.
 completed=1

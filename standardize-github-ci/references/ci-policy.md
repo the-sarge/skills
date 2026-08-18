@@ -1,168 +1,91 @@
-# Portfolio GitHub CI Policy
+# Portfolio GitHub CI Standard
 
 ## Contents
 
 - [Purpose](#purpose)
 - [Responsibility boundary](#responsibility-boundary)
-- [Required defaults](#required-defaults)
-  - [Stable required gate](#stable-required-gate)
-  - [Agent-gated validation](#agent-gated-validation)
-  - [Change classification](#change-classification)
-  - [Validation lanes](#validation-lanes)
-  - [Event policy](#event-policy)
-  - [Concurrency](#concurrency)
-  - [Timeouts](#timeouts)
-  - [Job ordering](#job-ordering)
-  - [Runner policy](#runner-policy)
-  - [Duplicate-work policy](#duplicate-work-policy)
-  - [Security policy](#security-policy)
-  - [Caching and artifacts](#caching-and-artifacts)
-  - [Schedules](#schedules)
+- [Required workflow](#required-workflow)
+- [Required jobs](#required-jobs)
+- [Taskfile contract](#taskfile-contract)
+- [Default-branch ruleset](#default-branch-ruleset)
+- [Non-required workflows](#non-required-workflows)
+- [Runners](#runners)
+- [Review-tool agnosticism](#review-tool-agnosticism)
+- [Agent convention](#agent-convention)
+- [What the standard forbids](#what-the-standard-forbids)
 
 ## Purpose
 
-Reduce GitHub-hosted runner consumption and feedback latency without weakening meaningful correctness, security, platform, or release coverage. Apply these defaults through repository-specific evidence rather than identical workflow files.
+One CI shape for every repository: a `pull_request`-triggered workflow that skips draft PRs, one or more independent required jobs that each run one Taskfile target, and one identical default-branch ruleset. The shape is identical across repositories so that any workflow, ruleset, or merge problem is the same problem everywhere. Cost control comes from drafts (no CI during review) and from a docs-only shortcut inside `task ci`, not from orchestration cleverness in YAML.
 
 ## Responsibility boundary
 
 | Layer | Owns |
 |---|---|
-| GitHub workflow YAML | Events, change routing, runners, dependencies, matrices, concurrency, timeouts, permissions, caches, secrets, schedules, artifacts |
-| Taskfile and repository scripts | Portable docs, format, lint, test, race, vulnerability, build, integration, and release commands |
-| RAS and agent/operator automation | Review the exact PR head outside GitHub, determine whether blockers remain, request CI only when ready, verify the resulting run and live head, and merge that same head |
-| GitHub settings | Required checks, rulesets, Actions budgets, runner groups, secrets, variables, permissions |
+| `.github/workflows/ci.yml` | Trigger, draft and same-repo guards, concurrency, permissions, timeouts, runner per job, pinned setup steps, one `task` call per job |
+| Taskfile and `scripts/ci-classify.sh` | What CI checks: `ci` decides docs-only vs. full, `docs-check` and `check` hold the repository's real commands, `ci-<lane>` holds any additional required lane |
+| Default-branch ruleset | Require PR, required `ci-*` checks, strict up-to-date, no force-push or deletion, squash-only |
+| Agent and review loop | Open PRs as drafts, review out of band, mark ready when locally certified, merge the exact green head |
 
-## Required defaults
+## Required workflow
 
-### Stable required gate
+Every repository has `.github/workflows/ci.yml` copied from [`assets/ci.yml`](../assets/ci.yml). It is byte-identical across repositories except `runs-on` and any additional `ci-<lane>` jobs.
 
-Keep one required result with a stable context such as `ci-required`. Let it validate the results of conditional jobs. Avoid requiring every conditional platform or security job separately. In an automatically triggered workflow, create it for every relevant event; in an agent-gated workflow, create it only during explicit validation and deliberately let its absence on a new PR head block merging before dispatch. GitHub may not credit `workflow_dispatch` job checks in the PR required-status rollup, so prove attribution live. When necessary, have the dispatched workflow publish the same generic commit-status context as pending after exact-head binding and success or failure after aggregation. Give the dispatched aggregate check a distinct display name because GitHub may require both a same-named check and commit status.
+- Trigger: exactly `pull_request` with `types: [opened, synchronize, reopened, ready_for_review]`. No `push`, `workflow_dispatch`, `pull_request_target`, `paths`, `paths-ignore`, or `branches` filters.
+- Concurrency: `group: ci-${{ github.event.pull_request.number }}`, `cancel-in-progress: true`.
+- Permissions: `contents: read` at workflow level and nothing else unless a Taskfile target demonstrably needs more.
+- Every job: `if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}`, `timeout-minutes`, third-party actions pinned to full commit SHAs, `actions/checkout` with `fetch-depth: 0` so `scripts/ci-classify.sh` can compute a merge base.
 
-Prefer one required job with conditional steps when all required validation can run on one runner. When required validation spans conditional or runner-specific jobs, put `ci-required` last, declare every contributing job in `needs`, and fail unless every required result succeeded or was intentionally skipped.
+Why the draft guard is safe: GitHub refuses to merge a draft PR regardless of checks, so a draft's skipped `ci-required` can never satisfy the ruleset. The moment the PR is marked ready, `ready_for_review` starts a real run on the live head; every later push starts another. The required check therefore only ever exists as a real run on a non-draft head.
 
-Do not rely only on workflow-level `paths` or `paths-ignore` for a required workflow. An entirely skipped required workflow may remain pending. A conditionally skipped job reports success, making job-level routing safer for required checks.
+## Required jobs
 
-### Agent-gated validation
+The workflow contains one or more independent required jobs:
 
-When an agent runs RAS or another review process before CI, use this cost-first sequence by default:
+- `ci-required` (always present) runs `task ci`.
+- `ci-<lane>` (optional, e.g. `ci-race`) runs `task ci-<lane>`. Use one when a lane must block merging *and* needs its own runner or timeout. Each `ci-<lane>` job repeats the guard, timeout, and pinned setup steps, sets its own `runs-on`, and appears in the ruleset's required checks.
+- No job declares `needs:`; no job uses `strategy.matrix`. Each required job either ran and passed or is absent, and absence blocks the merge. That is the fail-closed guarantee, and it needs no aggregation script.
 
-```text
-open/update PR without CI -> agent reviews exact head out of band -> resolve findings -> agent requests CI for that exact head -> verify required check and live head -> merge that same head
-```
+Choice rule: a lane that is merge-blocking today becomes a `ci-<lane>` job; a lane that is not merge-blocking moves to a [non-required workflow](#non-required-workflows).
 
-GitHub must remain agnostic about RAS by default. Do not represent RAS invocation or verdicts in workflow inputs, names, labels, statuses, comments, environments, or conditions. Do not start the certifying workflow automatically on `pull_request` or `pull_request_target` merely to make the required result appear. A new head without the required result is safely unmergeable. Preserve a manual or agent-driven dispatch path with generic exact-head/base inputs, verify that the workflow run head SHA and live PR head equal the requested SHA, and require a fresh agent-side review decision plus CI after any new push. A generic `ci-required` commit status is CI output, not RAS state: it may bridge a dispatched aggregate result into the PR ruleset when GitHub does not credit the job check itself. Guard terminal publication against cancellation and reject every cancelled run because cancellation can race with an already-started status request; if cancellation leaves pending, the agent aborts and requests fresh same-head CI rather than weakening the gate.
+## Taskfile contract
 
-The expected-SHA comparison is a race and ref-integrity guard, not an attestation that RAS passed. The default threat model trusts the agent/operator and same-repository branch writer who controls the PR, dispatch, verification, and exact-head merge. If malicious same-repository branch writers are explicitly in scope, design a trusted controller or dedicated check publisher as a separate security architecture and obtain approval for its credentials and settings; do not infer that stronger threat model merely because workflow code lives on the candidate branch.
+Copy [`assets/Taskfile.ci.yml`](../assets/Taskfile.ci.yml) into the repository `Taskfile.yml` and [`assets/ci-classify.sh`](../assets/ci-classify.sh) to `scripts/ci-classify.sh` unchanged.
 
-If live evidence shows that GitHub excludes dispatch checks from the required PR rollup, use a generic CI mechanism that preserves the same trust boundary. A one-shot operator-only pull-request activity is admissible only when it carries no RAS meaning, revokes its trigger, binds the live head, base, and synthetic merge SHAs, and starts no run on open or synchronize.
+- `ci`: runs `scripts/ci-classify.sh`; on `docs_only=true` runs `docs-check`, otherwise runs `check`. Empty diffs, an unknown base, and unknown file types classify as not docs-only.
+- `docs-check`: repository-owned documentation checks.
+- `check`: repository-owned ordinary merge gate (format, vet, lint, unit tests, build smoke).
+- `ci-<lane>`: runs the classifier, exits successfully with a message on docs-only changes, otherwise runs the lane.
+- `CI_DOCS_GLOBS` (Taskfile var): space-separated shell globs treated as documentation. Default `*.md docs/* DEV-JOURNAL.md LICENSE LICENSE.*`. Extend it per repository rather than editing the script.
 
-An automatic preflight may remain when its early signal justifies its cost, but it must be cheap, must not launch the expensive certification graph, and must not emit or accidentally satisfy the required certification check. Do not use a skipped required job as a pending gate.
+`task ci` behaves identically on a laptop and in CI, so a wrong classification is reproducible locally without pushing.
 
-A Task target may standardize agent-side RAS invocation, CI dispatch, run inspection, and exact-head merge, but it is optional. A successful `ras review` process exit does not mean the synthesis has no blockers; any wrapper must inspect the structured result before deciding to request CI. Keep that decision local to the agent rather than publishing it as GitHub workflow state.
+## Default-branch ruleset
 
-### Change classification
+Apply [`assets/ruleset.json`](../assets/ruleset.json) to every repository's default branch, replacing legacy branch protection where present. Ruleset changes are external mutations and require explicit operator authorization.
 
-Classify at least:
+- Require a pull request before merging.
+- Required status checks: every `ci-*` job in `ci.yml`, sourced from the GitHub Actions integration (`integration_id` 15368). Add `ci-<lane>` contexts to the asset's list per repository.
+- Strict required status checks (branch must be up to date with the default branch): GitHub, not the agent, blocks a merge when the default branch has advanced since CI ran; updating the branch re-runs CI.
+- Block force pushes and deletion.
+- Allowed merge methods: squash only.
 
-- docs-only;
-- source;
-- dependencies;
-- workflows or CI scripts;
-- platform-sensitive code;
-- release configuration.
+## Non-required workflows
 
-Fail closed: an unknown path is source-affecting until repository evidence admits it to a cheaper class. Treat an empty or indeterminate diff as source-affecting.
+Deep tests, fuzzing, security scans, cross-platform builds, and release publication keep their own workflows and names. They may use `schedule`, `push: tags`, or `workflow_dispatch`. They may not use `pull_request` or `pull_request_target`, and they are never required checks. Every job in them still sets `timeout-minutes` and pins actions.
 
-### Validation lanes
+## Runners
 
-Prefer these conceptual Taskfile lanes, adapting established names rather than renaming gratuitously:
+For a private repository, prefer a self-hosted runner label when one exists; otherwise `ubuntu-latest`. Route by job (`ci-<lane>` with its own `runs-on`), never by matrix inside a required job.
 
-| Lane | Typical content |
-|---|---|
-| `docs-check` | Whitespace, Markdown links, frontmatter, generated-doc freshness, docs-specific tests |
-| `check` | Formatting, vet, unit tests, ordinary lint, build smoke |
-| `deep-check` | Race, integration, vulnerability, native platforms, long contracts, bounded fuzzing |
-| `release-check` | Packaging, artifact/SBOM/signing metadata, release-specific validation |
+## Review-tool agnosticism
 
-Do not place every possible check in the PR lane merely because one Taskfile task can aggregate them.
+GitHub carries no review-tool state. There are no labels, inputs, statuses, comments, environments, or conditions that mention RAS or its verdicts. Draft status is the only signal and means "not ready for CI", nothing more.
 
-### Event policy
+## Agent convention
 
-| Event | Default behavior |
-|---|---|
-| Pull request without RAS | Complete merge gate selected by changed files |
-| Pull request with agent-side RAS | No automatic certifying CI; optional cheap preflight only, then agent-requested exact-head validation after findings are resolved |
-| Protected default-branch push | Deployment or reduced smoke; do not repeat the identical full PR suite |
-| Direct default-branch push | Complete validation only when direct pushes are possible and intentionally supported |
-| Schedule | Time-sensitive security, deep race/integration, native platform, bounded fuzzing |
-| Manual dispatch | Agent-requested exact-head validation, exceptional diagnostics, bounded evidence, or operator-selected deep work |
-| Tag/release | Release validation and publication |
+The shared [review loop](../../_shared/REVIEW-LOOP.md#exact-head-local-certification-and-hosted-ci) owns the sequence: open the PR as a draft; review and certify locally; `gh pr ready`; wait for every required `ci-*` check to succeed on the live head; `gh pr merge --squash --match-head-commit <head>`.
 
-Verify protection and merge behavior before dropping default-branch validation. If the workflow cannot distinguish protected PR merges from direct pushes reliably, keep a defensible default-branch gate or eliminate direct pushes through rulesets.
+## What the standard forbids
 
-### Concurrency
-
-Cancel superseded automatic pull-request work within each workflow. For agent-gated repositories, avoid starting certifying work before the agent requests it; also prevent duplicate dispatches for the same head when cancellation is safe. Keep workflow names in concurrency groups so unrelated workflows do not cancel one another. Do not cancel release publication or stateful deployment work unless its recovery model explicitly permits it.
-
-### Timeouts
-
-Set every job timeout. Suggested starting points:
-
-- classification, docs, and workflow lint: 5 minutes;
-- ordinary build, test, and lint: 10–20 minutes;
-- integration and native platform: 20–30 minutes;
-- fuzzing: explicit bounded work duration plus controlled overhead.
-
-Use repository evidence to adjust these numbers. A timeout is a containment boundary, not a performance target.
-
-### Job ordering
-
-After the agent requests CI, run cheap, broad failure detectors before expensive matrices:
-
-```text
-classify -> Linux/core verify -> security, native platform, integration, deep contracts
-```
-
-Avoid launching macOS, Windows, CodeQL, and long contracts alongside a basic build that may fail immediately.
-
-### Runner policy
-
-- Use Linux as the ordinary hosted PR runner.
-- Use Linux cross-compilation for pure-Go Darwin and Windows compilation when it provides the required signal.
-- Run native macOS and Windows only for platform-sensitive changes, schedules, or releases unless the repository proves broader need.
-- Apply routing to self-hosted jobs too; they consume machines and queue capacity even when GitHub does not bill runner minutes.
-- Do not treat public-repository hosted usage as a private-minute hotspot, but still reduce noise and latency.
-
-### Duplicate-work policy
-
-Justify rather than assume value from:
-
-- `go test ./...` followed by the same suite under `-race`;
-- vulnerability scanning in both the main gate and a dependency workflow;
-- OS-independent lint on multiple operating systems;
-- repeated checkout, toolchain, private-module, or tool installation across independent jobs;
-- per-binary builds followed by an all-package build;
-- complete PR validation followed by complete validation of the identical merged commit;
-- complete certification on every intermediate head that RAS later blocks or supersedes;
-- two fuzz systems covering the same targets on the same cadence.
-
-Keep duplicated execution only when it produces a distinct signal or materially improves feedback time at acceptable cost.
-
-### Security policy
-
-Separate event-sensitive and time-sensitive coverage:
-
-- run dependency review when manifests or lockfiles change;
-- run SAST and CodeQL when source or their configuration changes;
-- scan changed PR content for secrets, including documentation;
-- run full vulnerability, SAST, and secret-history scans on a schedule because external advisories change without repository commits.
-
-Do not skip secret scanning merely because a change is documentation-only; documentation can contain credentials.
-
-### Caching and artifacts
-
-Cache immutable dependency downloads when repository policy permits it. Do not cache outputs whose clean deterministic rebuild is the assertion. Set explicit short artifact retention for disposable evidence, corpus, or diagnostic artifacts.
-
-### Schedules
-
-Stagger schedules away from the top of the hour and across repositories. Give every scheduled workflow a concurrency policy and timeout. Disable redundant schedules in legacy or superseded repositories.
+Dispatch inputs carrying head or base SHAs, commit statuses published to bridge a dispatched run into the ruleset, certification labels, `ready_for_review` used as a certification trigger, multi-job aggregates with `needs`, workflow-level change classification or path filters on the required workflow, and any encoding of out-of-band review state in GitHub. Do not reintroduce them under other names.
