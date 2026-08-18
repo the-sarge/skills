@@ -380,7 +380,115 @@ run_audit "$conf" CI_AUDIT_RULESET_JSON="$tmp/rules-empty.json"; out="$audit_out
 expect_deviation "$out" RULES-PR
 expect_deviation "$out" RULES-CHECKS
 
+# an unparseable non-required workflow must not pass silently
+badwf="$tmp/badwf"
+make_conformant_repo "$badwf"
+printf 'on: [\n' > "$badwf/.github/workflows/broken.yml"
+git -C "$badwf" add . && git -C "$badwf" commit -qm broken
+run_audit "$badwf"; out="$audit_out"
+test "$audit_rc" -eq 3 || fail "audit: unparseable non-required workflow must exit 3; got $audit_rc:
+$out"
+expect_deviation "$out" WF-PARSE
+expect_report "$out"
+
+# a missing Taskfile is missing every required task, not just ci
+notf="$tmp/notaskfile"
+make_conformant_repo "$notf"
+git -C "$notf" rm -q Taskfile.yml && git -C "$notf" commit -qm notaskfile
+run_audit "$notf"; out="$audit_out"
+test "$audit_rc" -eq 3 || fail "audit: missing Taskfile must exit 3; got $audit_rc:
+$out"
+expect_deviation "$out" TASK-CI-MISSING
+expect_deviation "$out" TASK-CHECK-MISSING
+expect_deviation "$out" TASK-DOCS-CHECK-MISSING
+
+# an unusable rules source is a tool error, never a silent pass
+: > "$tmp/rules-empty-file.json"
+run_audit "$conf" CI_AUDIT_RULESET_JSON="$tmp/rules-empty-file.json"; out="$audit_out"
+test "$audit_rc" -eq 2 || fail "audit: empty rules file must exit 2; got $audit_rc:
+$out"
+printf '{"message":"Not Found"}\n' > "$tmp/rules-notfound.json"
+run_audit "$conf" CI_AUDIT_RULESET_JSON="$tmp/rules-notfound.json"; out="$audit_out"
+test "$audit_rc" -eq 2 || fail "audit: non-array rules source must exit 2; got $audit_rc:
+$out"
+run_audit "$conf" CI_AUDIT_RULESET_JSON="$tmp/does-not-exist.json"; out="$audit_out"
+test "$audit_rc" -eq 2 || fail "audit: unreadable rules file must exit 2; got $audit_rc:
+$out"
+
+# without a parseable ci.yml the required contexts are unknown, not empty
+run_audit "$nowf" CI_AUDIT_RULESET_JSON="$good_rules"; out="$audit_out"
+printf '%s\n' "$out" | rg -Fq 'expected unknown' || fail "audit: required contexts must read unknown without ci.yml:
+$out"
+if printf '%s\n' "$out" | rg -Fq '`RULES-CHECKS`'; then
+  fail "audit: must not compare required contexts without ci.yml:
+$out"
+fi
+
+# --- live ruleset mode, against a gh stand-in (never the network)
+ghbin="$tmp/ghbin"
+mkdir -p "$ghbin"
+cat > "$ghbin/gh" <<'SH'
+#!/usr/bin/env bash
+# Minimal gh stand-in for audit-ci.sh live mode. GH_FAKE_FAIL fails every call;
+# GH_FAKE_PROTECTION selects the HTTP status of the legacy-protection probe.
+if test -n "${GH_FAKE_FAIL:-}"; then
+  printf 'gh: Bad credentials (HTTP 401)\n' >&2
+  exit 1
+fi
+case "$*" in
+  *'/protection'*)
+    case "${GH_FAKE_PROTECTION:-404}" in
+      200) exit 0 ;;
+      404) printf 'gh: Branch not protected (HTTP 404)\n' >&2; exit 1 ;;
+      *) printf 'gh: Resource not accessible (HTTP %s)\n' "${GH_FAKE_PROTECTION}" >&2; exit 1 ;;
+    esac ;;
+  *'/rules/branches/'*) cat "$GH_FAKE_RULES" ;;
+  *) printf 'main\n' ;;
+esac
+SH
+chmod +x "$ghbin/gh"
+
+live="$tmp/live"
+make_conformant_repo "$live"
+git -C "$live" remote add origin https://github.com/example/repo.git
+
+run_audit "$live" PATH="$ghbin:$PATH" CI_AUDIT_RULESET=live GH_FAKE_RULES="$good_rules" GH_FAKE_PROTECTION=404
+out="$audit_out"
+test "$audit_rc" -eq 0 || fail "audit: live mode with a conformant ruleset must exit 0; got $audit_rc:
+$out"
+printf '%s\n' "$out" | rg -Fq -- '- Legacy branch protection: absent' || fail "audit: must report legacy protection absent:
+$out"
+
+run_audit "$live" PATH="$ghbin:$PATH" CI_AUDIT_RULESET=live GH_FAKE_RULES="$good_rules" GH_FAKE_PROTECTION=200
+out="$audit_out"
+test "$audit_rc" -eq 3 || fail 'audit: live legacy protection present must exit 3'
+expect_deviation "$out" RULES-LEGACY
+printf '%s\n' "$out" | rg -Fq -- '- Legacy branch protection: present' || fail "audit: must report legacy protection present:
+$out"
+
+# a 403 on the protection probe must not read as absent
+run_audit "$live" PATH="$ghbin:$PATH" CI_AUDIT_RULESET=live GH_FAKE_RULES="$good_rules" GH_FAKE_PROTECTION=403
+out="$audit_out"
+test "$audit_rc" -eq 3 || fail "audit: unknown legacy protection must exit 3; got $audit_rc:
+$out"
+expect_deviation "$out" RULES-LEGACY
+printf '%s\n' "$out" | rg -Fq -- '- Legacy branch protection: unknown' || fail "audit: must report legacy protection unknown:
+$out"
+
+# gh failure and a missing origin are tool errors, not partial reports
+run_audit "$live" PATH="$ghbin:$PATH" CI_AUDIT_RULESET=live GH_FAKE_FAIL=1; out="$audit_out"
+test "$audit_rc" -eq 2 || fail "audit: gh failure in live mode must exit 2; got $audit_rc:
+$out"
+printf '%s\n' "$out" | rg -Fq 'via gh' || fail "audit: gh failure must name the cause:
+$out"
+
+run_audit "$conf" PATH="$ghbin:$PATH" CI_AUDIT_RULESET=live GH_FAKE_RULES="$good_rules"; out="$audit_out"
+test "$audit_rc" -eq 2 || fail "audit: live mode without an origin remote must exit 2; got $audit_rc:
+$out"
+
 # --- docs
 
+# New test sections belong above this line, under their own `# ---` marker;
+# nothing may follow `completed=1` but the success line.
 completed=1
 printf 'skill fixtures passed\n'

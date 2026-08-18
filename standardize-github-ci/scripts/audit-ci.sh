@@ -131,6 +131,7 @@ if test -d "$workflow_dir"; then
     base_name="$(basename "$wf_path")"
     if ! owf="$(yq -o=json -I=0 '.' "$wf_path" 2>/dev/null)" || test -z "$owf"; then
       printf -- '- `%s`: not parseable as YAML\n' "$base_name"
+      deviate WF-PARSE "$rel: not parseable as YAML; timeout and pin checks skipped"
       continue
     fi
     ojobs="$(printf '%s' "$owf" | jq -c '(.jobs? // {}) | if type=="object" then . else {} end' 2>/dev/null)" || ojobs=''
@@ -162,6 +163,8 @@ taskfile="$(find "$repo_root" -maxdepth 1 -type f \( -iname 'taskfile.yml' -o -i
 if test -z "$taskfile"; then
   printf -- '- Missing\n'
   deviate TASK-CI-MISSING 'Taskfile.yml: not found; the required workflow runs task ci'
+  deviate TASK-CHECK-MISSING 'Taskfile.yml: not found; task check is required'
+  deviate TASK-DOCS-CHECK-MISSING 'Taskfile.yml: not found; task docs-check is required'
 else
   tasks_json="$(yq -o=json -I=0 '.tasks // {}' "$taskfile" 2>/dev/null)" || tasks_json=''
   case "$tasks_json" in '{'*) ;; *) tasks_json='{}' ;; esac
@@ -189,45 +192,81 @@ fi
 printf '\n'
 
 # --- default-branch rules
+# Fails closed: a configured rules source that cannot be read, is empty, or is
+# not a JSON array is a tool error (exit 2), never a silent pass. The same goes
+# for any gh call in live mode -- an unauthenticated or rate-limited run must
+# not be reported as "no rules found".
 printf '## Default-branch rules\n\n'
 rules_json=""
+rules_configured=0
 rules_source='not checked (set CI_AUDIT_RULESET=live or CI_AUDIT_RULESET_JSON=<file>)'
-legacy_protection=unknown
+legacy_protection='not checked'
+legacy_reason=""
+gh_failed() { # what, detail
+  printf 'error: cannot read %s via gh: %s\n' "$1" "$(printf '%s' "$2" | tr '\n' ' ')" >&2
+  exit 2
+}
 if test -n "${CI_AUDIT_RULESET_JSON:-}"; then
+  rules_configured=1
+  rules_origin="$CI_AUDIT_RULESET_JSON"
+  rules_source="\`$CI_AUDIT_RULESET_JSON\`"
   rules_json="$(cat "$CI_AUDIT_RULESET_JSON" 2>/dev/null)" || {
     printf 'error: cannot read CI_AUDIT_RULESET_JSON: %s\n' "$CI_AUDIT_RULESET_JSON" >&2
     exit 2
   }
-  rules_source="\`$CI_AUDIT_RULESET_JSON\`"
 elif test "${CI_AUDIT_RULESET:-}" = live; then
+  rules_configured=1
   require_command gh
   origin_url="$(git -C "$repo_root" remote get-url origin 2>/dev/null || true)"
   slug="$(printf '%s' "$origin_url" | sed -E 's#^(https://github.com/|git@github.com:)##; s#\.git$##')"
-  default_branch="$(gh api "repos/$slug" --jq .default_branch)"
-  rules_json="$(gh api "repos/$slug/rules/branches/$default_branch")"
+  if test -z "$slug"; then
+    printf 'error: cannot read default-branch rules: no origin remote to derive a GitHub slug from\n' >&2
+    exit 2
+  fi
+  rules_origin="live $slug"
+  default_branch="$(gh api "repos/$slug" --jq .default_branch 2>&1)" \
+    || gh_failed "the default branch of $slug" "$default_branch"
+  test -n "$default_branch" || gh_failed "the default branch of $slug" 'empty response'
+  rules_json="$(gh api "repos/$slug/rules/branches/$default_branch" 2>&1)" \
+    || gh_failed "default-branch rules for $slug" "$rules_json"
   rules_source="live \`$slug\` \`$default_branch\`"
-  if gh api "repos/$slug/branches/$default_branch/protection" >/dev/null 2>&1; then
+  rules_origin="live $slug $default_branch"
+  # A 404 means "not protected"; anything else (403, 401, network) is unknown,
+  # and unknown must not read as absent.
+  if protection_err="$(gh api --silent "repos/$slug/branches/$default_branch/protection" 2>&1)"; then
     legacy_protection=present
-  else
+  elif printf '%s' "$protection_err" | grep -q 'HTTP 404'; then
     legacy_protection=absent
+  else
+    legacy_protection=unknown
+    legacy_reason="$(printf '%s' "$protection_err" | tr '\n' ' ')"
   fi
 fi
 printf -- '- Source: %s\n' "$rules_source"
-if test -n "$rules_json"; then
+printf -- '- Legacy branch protection: %s\n' "$legacy_protection"
+if test "$rules_configured" -eq 1; then
+  printf '%s' "$rules_json" | jq -e 'type=="array"' >/dev/null 2>&1 \
+    || { printf 'error: default-branch rules source is empty or not a JSON array: %s\n' "$rules_origin" >&2; exit 2; }
   r() { printf '%s' "$rules_json" | jq -e "$1" >/dev/null 2>&1; }
   r 'any(.[]; .type=="pull_request")' || deviate RULES-PR 'default branch: a pull_request rule is required (no direct pushes)'
   r 'any(.[]; .type=="pull_request" and (.parameters.allowed_merge_methods // []) == ["squash"])' || deviate RULES-SQUASH 'default branch: allowed merge methods must be exactly [squash]'
   r 'any(.[]; .type=="deletion")' || deviate RULES-DELETION 'default branch: deletion must be blocked'
   r 'any(.[]; .type=="non_fast_forward")' || deviate RULES-FF 'default branch: force pushes must be blocked'
   r 'any(.[]; .type=="required_status_checks" and .parameters.strict_required_status_checks_policy==true)' || deviate RULES-STRICT 'default branch: required status checks must be strict (branch up to date)'
-  expected_contexts="$(printf '%s\n' "${job_names:-}" | { grep -E '^ci-' || true; } | sort | jq -R . | jq -sc .)"
   actual_contexts="$(printf '%s' "$rules_json" | jq -c '[.[] | select(.type=="required_status_checks") | .parameters.required_status_checks[]? | .context] | sort' 2>/dev/null)" || actual_contexts=''
   test -n "$actual_contexts" || actual_contexts='[]'
-  printf -- '- Required contexts: expected `%s`, actual `%s`\n' "$expected_contexts" "$actual_contexts"
-  test "$expected_contexts" = "$actual_contexts" || deviate RULES-CHECKS "default branch: required status checks must be exactly the ci-* jobs $expected_contexts (actual $actual_contexts)"
-  if test "$legacy_protection" = present; then
-    deviate RULES-LEGACY 'default branch: legacy branch protection is present; replace it with the ruleset'
+  if test -z "${job_names:-}"; then
+    # CI-MISSING already covers this; comparing against no jobs would only add noise.
+    printf -- '- Required contexts: expected unknown (ci.yml missing or unparseable), actual `%s`\n' "$actual_contexts"
+  else
+    expected_contexts="$(printf '%s\n' "$job_names" | { grep -E '^ci-' || true; } | sort | jq -R . | jq -sc .)"
+    printf -- '- Required contexts: expected `%s`, actual `%s`\n' "$expected_contexts" "$actual_contexts"
+    test "$expected_contexts" = "$actual_contexts" || deviate RULES-CHECKS "default branch: required status checks must be exactly the ci-* jobs $expected_contexts (actual $actual_contexts)"
   fi
+  case "$legacy_protection" in
+    present) deviate RULES-LEGACY 'default branch: legacy branch protection is present; replace it with the ruleset' ;;
+    unknown) deviate RULES-LEGACY "default branch: legacy branch protection state unknown (gh returned $legacy_reason); verify and remove it manually" ;;
+  esac
 fi
 printf '\n'
 
