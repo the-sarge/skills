@@ -138,6 +138,93 @@ test "$(classify_in CI_DEFAULT_BRANCH=main)" = 'docs_only=true' || fail 'classif
 
 # --- audit
 
+test -x "$audit" || fail "missing or non-executable $audit"
+
+# helper: build a repo with the shipped assets in place; caller mutates then audits
+make_conformant_repo() {
+  dir="$1"
+  mkdir -p "$dir/.github/workflows" "$dir/scripts"
+  git -C "$dir" init -q -b main
+  git -C "$dir" config user.email ci-skill-test@example.invalid
+  git -C "$dir" config user.name ci-skill-test
+  cp "$workflow_asset" "$dir/.github/workflows/ci.yml"
+  cp "$classify" "$dir/scripts/ci-classify.sh"
+  cp "$taskfile_asset" "$dir/Taskfile.yml"
+  printf 'module example.test\n\ngo 1.22\n' > "$dir/go.mod"
+  git -C "$dir" add . && git -C "$dir" commit -qm conformant
+}
+
+# Sets audit_out and audit_rc in the caller. Deliberately not used inside a
+# command substitution: that subshell would discard audit_rc.
+run_audit() { # dir [env...]
+  dir="$1"; shift
+  set +e
+  audit_out="$(env "$@" "$audit" "$dir" 2>&1)"
+  audit_rc=$?
+  set -e
+}
+
+expect_deviation() { # output code
+  printf '%s\n' "$1" | rg -Fq "\`$2\`" || fail "audit: expected deviation $2; got:
+$1"
+}
+
+conf="$tmp/conformant"
+make_conformant_repo "$conf"
+run_audit "$conf"; out="$audit_out"
+test "$audit_rc" -eq 0 || fail "audit: conformant repo must exit 0; got $audit_rc:
+$out"
+printf '%s\n' "$out" | rg -Fq -- '- None. Repository conforms to the standard.' || fail "audit: conformant repo must report no deviations:
+$out"
+printf '%s\n' "$out" | rg -Fq 'Required jobs: `ci-required`' || fail 'audit: must list required jobs'
+
+# each mutation of ci.yml produces its named deviation and exit 3
+mutate() { # code, yq-expression
+  d="$tmp/mut-$1"
+  rm -rf "$d"; make_conformant_repo "$d"
+  yq -i "$2" "$d/.github/workflows/ci.yml"
+  run_audit "$d"; out="$audit_out"
+  test "$audit_rc" -eq 3 || fail "audit: $1 fixture must exit 3; got $audit_rc:
+$out"
+  expect_deviation "$out" "$1"
+}
+mutate CI-TRIGGER '.on.push = {"branches":["main"]}'
+mutate CI-TRIGGER '.on.pull_request.types = ["opened","synchronize"]'
+mutate CI-TRIGGER '.on.pull_request.paths = ["**.go"]'
+mutate CI-CONCURRENCY 'del(.concurrency)'
+mutate CI-CONCURRENCY '.concurrency["cancel-in-progress"] = false'
+mutate CI-PERMISSIONS '.permissions.contents = "write"'
+mutate CI-JOB-NAME '.jobs.build = .jobs["ci-required"] | .jobs.build.steps[-1].run = "task build"'
+mutate CI-JOBS 'del(.jobs["ci-required"])'
+mutate CI-GUARD '.jobs["ci-required"].if = "${{ !github.event.pull_request.draft }}"'
+mutate CI-GUARD 'del(.jobs["ci-required"].if)'
+mutate CI-TIMEOUT 'del(.jobs["ci-required"]["timeout-minutes"])'
+mutate CI-NEEDS '.jobs["ci-lint"] = .jobs["ci-required"] | .jobs["ci-lint"].steps[-1].run = "task ci-lint" | .jobs["ci-required"].needs = ["ci-lint"]'
+mutate CI-MATRIX '.jobs["ci-required"].strategy.matrix.os = ["ubuntu-latest","macos-latest"]'
+mutate CI-TARGET '.jobs["ci-required"].steps[-1].run = "task check"'
+mutate CI-TARGET '.jobs["ci-required"].steps += [{"run":"task extra"}]'
+mutate CI-TARGET '.jobs["ci-race"] = .jobs["ci-required"]'
+mutate CI-PIN '.jobs["ci-required"].steps[0].uses = "actions/checkout@v7"'
+mutate CI-FETCH-DEPTH 'del(.jobs["ci-required"].steps[0].with)'
+
+# a second well-formed lane is conformant
+lane="$tmp/lane"
+make_conformant_repo "$lane"
+yq -i '.jobs["ci-race"] = .jobs["ci-required"] | .jobs["ci-race"]["runs-on"] = "self-hosted-xlarge" | .jobs["ci-race"].steps[-1].run = "task ci-race"' "$lane/.github/workflows/ci.yml"
+git -C "$lane" commit -qam lane
+run_audit "$lane"; out="$audit_out"
+test "$audit_rc" -eq 0 || fail "audit: two-lane repo must exit 0:
+$out"
+printf '%s\n' "$out" | rg -Fq 'Required jobs: `ci-required`, `ci-race`' || fail 'audit: must list both required jobs'
+
+# missing workflow
+nowf="$tmp/nowf"
+make_conformant_repo "$nowf"
+git -C "$nowf" rm -q .github/workflows/ci.yml && git -C "$nowf" commit -qm nowf
+run_audit "$nowf"; out="$audit_out"
+test "$audit_rc" -eq 3 || fail 'audit: missing ci.yml must exit 3'
+expect_deviation "$out" CI-MISSING
+
 # --- docs
 
 printf 'skill fixtures passed\n'
