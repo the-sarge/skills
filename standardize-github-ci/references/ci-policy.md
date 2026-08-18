@@ -44,6 +44,7 @@ The workflow contains one or more independent required jobs:
 
 - `ci-required` (always present) runs `task ci`.
 - `ci-<lane>` (optional, e.g. `ci-race`) runs `task ci-<lane>`. Use one when a lane must block merging *and* needs its own runner or timeout. Each `ci-<lane>` job repeats the guard, timeout, and pinned setup steps, sets its own `runs-on`, and appears in the ruleset's required checks.
+- A job may add a job-level `env:` mapping repository secrets or variables the Taskfile target consumes (for example a private-module token), and a `ci-<lane>` job may declare `services:` or `container:` when the lane needs them; the Taskfile still owns what runs. Nothing else varies.
 - No job declares `needs:`; no job uses `strategy.matrix`. Each required job either ran and passed or is absent, and absence blocks the merge. That is the fail-closed guarantee, and it needs no aggregation script.
 
 Choice rule: a lane that is merge-blocking today becomes a `ci-<lane>` job; a lane that is not merge-blocking moves to a [non-required workflow](#non-required-workflows).
@@ -76,7 +77,7 @@ Deep tests, fuzzing, security scans, cross-platform builds, and release publicat
 
 ## Runners
 
-For a private repository, prefer a self-hosted runner label when one exists; otherwise `ubuntu-latest`. Route by job (`ci-<lane>` with its own `runs-on`), never by matrix inside a required job.
+For a private repository, prefer a self-hosted runner label when one exists; otherwise `ubuntu-latest`. Route by job (`ci-<lane>` with its own `runs-on`), never by matrix inside a required job. `actions/setup-go@v7` and `arduino/setup-task@v3` are Node 24 actions; a self-hosted runner image must be recent enough to run Node 24 or the setup steps fail before `task ci` starts.
 
 ## Review-tool agnosticism
 

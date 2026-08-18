@@ -15,7 +15,7 @@ Produce, per repository: the mapping from old jobs to `ci-required` / `ci-<lane>
 
 ## 3. Apply (on a feature branch, after approval)
 
-1. Copy `assets/ci.yml` to `.github/workflows/ci.yml`; set `runs-on`; add `ci-<lane>` jobs by duplicating `ci-required` and changing only the job name, `runs-on`, `timeout-minutes`, and the `task ci-<lane>` step.
+1. Copy `assets/ci.yml` to `.github/workflows/ci.yml`; set `runs-on`; add `ci-<lane>` jobs by duplicating `ci-required` and changing only the job name, `runs-on`, `timeout-minutes`, the `task ci-<lane>` step, and any job-level `env:`/`services:` the lane needs.
 2. Copy `assets/ci-classify.sh` to `scripts/ci-classify.sh` unchanged and make it executable.
 3. Merge `assets/Taskfile.ci.yml` into `Taskfile.yml`: add `ci`, `docs-check`, `check`, and one `ci-<lane>` per extra job; point `check` and `docs-check` at the repository's existing commands.
 4. Remove `pull_request` and `pull_request_target` from every other workflow; delete workflows that only existed to certify PRs (dispatch/label/status-bridge workflows). Keep deep, security, fuzz, cross-platform, and release workflows on their non-PR triggers, pinned and with timeouts.
