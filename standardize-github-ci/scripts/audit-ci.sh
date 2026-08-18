@@ -81,7 +81,7 @@ else
     case "$job" in
       ci-required) target='task ci' ;;
       ci-*) target="task $job" ;;
-      *) deviate CI-JOB-NAME "ci.yml: job $job must be named ci-required or ci-<lane>"; continue ;;
+      *) deviate CI-JOB-NAME "ci.yml: job $job is not part of the standard; delete it, or rename it to ci-required or ci-<lane> if it belongs in the required workflow"; continue ;;
     esac
     required_jobs="${required_jobs:+$required_jobs, }\`$job\`"
     jobjson="$(printf '%s' "$wf" | jq -c --arg job "$job" '.jobs[$job] | if type=="object" then . else {} end' 2>/dev/null)" || jobjson=''
@@ -162,7 +162,7 @@ printf '## Taskfile\n\n'
 taskfile="$(find "$repo_root" -maxdepth 1 -type f \( -iname 'taskfile.yml' -o -iname 'taskfile.yaml' \) -print -quit)"
 if test -z "$taskfile"; then
   printf -- '- Missing\n'
-  deviate TASK-CI-MISSING 'Taskfile.yml: not found; the required workflow runs task ci'
+  deviate TASK-CI-MISSING 'Taskfile.yml: not found; the required workflow runs task ci -- add a Taskfile and copy task ci from the skill asset assets/Taskfile.ci.yml'
   deviate TASK-CHECK-MISSING 'Taskfile.yml: not found; task check is required'
   deviate TASK-DOCS-CHECK-MISSING 'Taskfile.yml: not found; task docs-check is required'
 else
@@ -172,7 +172,7 @@ else
   for t in ci check docs-check; do
     if has_task "$t"; then printf -- '- `%s`: present\n' "$t"; else printf -- '- `%s`: missing\n' "$t"; fi
   done
-  has_task ci || deviate TASK-CI-MISSING "$(basename "$taskfile"): task ci is required"
+  has_task ci || deviate TASK-CI-MISSING "$(basename "$taskfile"): task ci is required; copy it from the skill asset assets/Taskfile.ci.yml"
   has_task check || deviate TASK-CHECK-MISSING "$(basename "$taskfile"): task check is required"
   has_task docs-check || deviate TASK-DOCS-CHECK-MISSING "$(basename "$taskfile"): task docs-check is required"
   while IFS= read -r job; do
@@ -187,7 +187,7 @@ if test -x "$repo_root/scripts/ci-classify.sh"; then
   printf -- '- `scripts/ci-classify.sh`: present\n'
 else
   printf -- '- `scripts/ci-classify.sh`: missing\n'
-  deviate CLASSIFY-MISSING 'scripts/ci-classify.sh: missing or not executable; copy it from the skill assets'
+  deviate CLASSIFY-MISSING 'scripts/ci-classify.sh: missing or not executable; copy the skill asset assets/ci-classify.sh to scripts/ci-classify.sh and chmod +x it'
 fi
 printf '\n'
 
@@ -257,14 +257,14 @@ if test "$rules_configured" -eq 1; then
   test -n "$actual_contexts" || actual_contexts='[]'
   if test -z "${job_names:-}"; then
     # CI-MISSING already covers this; comparing against no jobs would only add noise.
-    printf -- '- Required contexts: expected unknown (ci.yml missing or unparseable), actual `%s`\n' "$actual_contexts"
+    printf -- '- Required contexts (from rulesets only): expected unknown (ci.yml missing or unparseable), actual `%s`\n' "$actual_contexts"
   else
     expected_contexts="$(printf '%s\n' "$job_names" | { grep -E '^ci-' || true; } | sort | jq -R . | jq -sc .)"
-    printf -- '- Required contexts: expected `%s`, actual `%s`\n' "$expected_contexts" "$actual_contexts"
+    printf -- '- Required contexts (from rulesets only): expected `%s`, actual `%s`\n' "$expected_contexts" "$actual_contexts"
     test "$expected_contexts" = "$actual_contexts" || deviate RULES-CHECKS "default branch: required status checks must be exactly the ci-* jobs $expected_contexts (actual $actual_contexts)"
   fi
   case "$legacy_protection" in
-    present) deviate RULES-LEGACY 'default branch: legacy branch protection is present; replace it with the ruleset' ;;
+    present) deviate RULES-LEGACY 'default branch: legacy branch protection is present; the rule checks above read rulesets only, so any protection it enforces (required checks, strict, reviews) is not reflected above. Delete the legacy protection, then apply the ruleset' ;;
     unknown) deviate RULES-LEGACY "default branch: legacy branch protection state unknown (gh returned $legacy_reason); verify and remove it manually" ;;
   esac
 fi
