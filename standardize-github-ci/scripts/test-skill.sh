@@ -522,6 +522,38 @@ run_audit "$conf" PATH="$ghbin:$PATH" CI_AUDIT_RULESET=live GH_FAKE_RULES="$good
 test "$audit_rc" -eq 2 || fail "audit: live mode without an origin remote must exit 2; got $audit_rc:
 $out"
 
+# --- task ci end to end (only when `task` is installed)
+
+# Proves the Taskfile branch, not just the classifier: the asset's docs-check and
+# check bodies echo distinctive placeholder text, so the output names the lane taken.
+if command -v task >/dev/null; then
+  docs_marker="replace with the repository's documentation checks"
+  check_marker="replace with the repository's format, vet, lint, test, and build checks"
+  taskrun="$tmp/taskrun"
+  make_conformant_repo "$taskrun"
+
+  git -C "$taskrun" checkout -qb docs-only-change
+  printf '# readme\n' > "$taskrun/README.md"
+  git -C "$taskrun" add . && git -C "$taskrun" commit -qm docs
+  task_out="$(cd "$taskrun" && task ci 2>&1)" || fail "task ci: failed on a docs-only diff:
+$task_out"
+  printf '%s\n' "$task_out" | rg -Fq "$docs_marker" || fail "task ci: docs-only diff must run docs-check; got:
+$task_out"
+  if printf '%s\n' "$task_out" | rg -Fq "$check_marker"; then
+    fail "task ci: docs-only diff must not run check; got:
+$task_out"
+  fi
+
+  git -C "$taskrun" checkout -q main
+  git -C "$taskrun" checkout -qb source-change
+  printf 'package pkg\n' > "$taskrun/pkg.go"
+  git -C "$taskrun" add . && git -C "$taskrun" commit -qm source
+  task_out="$(cd "$taskrun" && task ci 2>&1)" || fail "task ci: failed on a source diff:
+$task_out"
+  printf '%s\n' "$task_out" | rg -Fq "$check_marker" || fail "task ci: source diff must run check; got:
+$task_out"
+fi
+
 # --- docs
 
 policy="$skill_root/references/ci-policy.md"
