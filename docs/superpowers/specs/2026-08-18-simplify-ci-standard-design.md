@@ -119,7 +119,7 @@ GitHub carries no review-tool state. There are no labels, inputs, statuses, comm
 1. Open every PR as a draft.
 2. Run the RAS review loop and local exact-head certification as today; no hosted CI runs during this phase.
 3. When local certification passes on the live head, mark the PR ready (`gh pr ready`).
-4. Wait until a `ci` run triggered by `ready_for_review` (or a later `synchronize`) on the live head has completed with conclusion `success`; a `skipped` conclusion left from the draft phase is not evidence. A push after ready re-runs CI on the new head; that is expected. If the default branch advances, GitHub blocks the merge until the branch is updated, which re-runs CI.
+4. Wait until a `ci` run started after the PR was marked ready (or by a later push) on the live head has completed with conclusion `success`; a `skipped` conclusion left from the draft phase is not evidence. A push after ready re-runs CI on the new head; that is expected. If the default branch advances, GitHub blocks the merge until the branch is updated, which re-runs CI.
 5. Merge with `gh pr merge --squash --match-head-commit <head>`.
 6. Journal and tracking steps are unchanged.
 

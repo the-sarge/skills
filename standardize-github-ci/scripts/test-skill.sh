@@ -519,7 +519,14 @@ if rg -qi 'dispatch|exact-head' "$skill_root/agents/openai.yaml"; then
 fi
 
 rg -Fq 'skipped' "$policy" || fail 'ci-policy.md: must state the skipped-check mechanism'
-rg -Fq 'ready_for_review' "$migration" || fail 'migration.md: must describe the ready_for_review run'
+rg -Fq 'post-ready' "$migration" || fail 'migration.md: must describe the post-ready run'
+# A workflow run's `event` is the trigger name; the activity type lives in the
+# payload, so no document may tell an agent to match on `event: ready_for_review`.
+for doc in "$policy" "$migration" "$skill_md" "$repo_root/_shared/REVIEW-LOOP.md"; do
+  if rg -Fq 'event: ready_for_review' "$doc"; then
+    fail "$doc: a workflow run reports event: pull_request, never event: ready_for_review"
+  fi
+done
 rg -Fq 'gh pr ready' "$skill_md" || fail 'SKILL.md: must describe marking the PR ready'
 rg -Fq 'short_description: "Audit and apply the draft-gated pull_request CI standard"' "$skill_root/agents/openai.yaml" || fail 'openai.yaml: short_description must match'
 

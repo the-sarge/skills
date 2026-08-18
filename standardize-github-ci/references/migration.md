@@ -47,12 +47,12 @@ Until the migration PR merges, the *old* required check names may still be refer
 ## 7. Verify on the migration PR (this is the live test of GitHub behavior)
 
 1. Draft: `gh pr view --json isDraft,mergeable` shows draft; `gh run list --workflow ci.yml --branch <branch> --json event,conclusion` shows the run(s) with every `ci-*` job skipped (`gh run view <id> --json jobs`), and the PR cannot be merged.
-2. `gh pr ready`. Expect a new `ci` run with `event: ready_for_review` whose head SHA equals `gh pr view --json headRefOid`, in which every `ci-*` job actually executes and succeeds. Expect every `ci-*` check in `gh pr checks` to show a real (non-skipped) success.
+2. `gh pr ready`. Expect a new `ci` run on the live head (both runs show `event: pull_request`; the new one has a later `createdAt`) whose head SHA equals `gh pr view --json headRefOid` and in which every `ci-*` job reports `success` in `gh run view <id> --json jobs`, not `skipped`.
 3. Push a docs-only commit (for example a line in `DEV-JOURNAL.md` or `docs/`). Expect the run's `ci-required` log to show `task docs-check` ran and no `task check`.
 4. Push a source commit. Expect `task check` to run.
 5. If possible, land an unrelated change on the default branch and confirm `gh pr view --json mergeStateStatus` becomes `BEHIND` and the merge button is blocked until `gh pr update-branch` (or a rebase) re-runs CI.
 6. Confirm the merge is blocked while any `ci-*` check is pending or failed.
-7. Confirm the merge rule end to end: immediately after `gh pr ready` and before the new run completes, `gh pr checks` may still show the draft-phase `skipped` check — record that this is not accepted as merge evidence; merge only after the `ready_for_review` run reports `success`.
+7. Confirm the merge rule end to end: immediately after `gh pr ready` and before the new run completes, `gh pr checks` may still show the draft-phase `skipped` check — record that this is not accepted as merge evidence; merge only after the latest post-ready `ci` run on the live head reports `success` for every `ci-*` job.
 
 Record head SHAs, run ids, and check names for each observation in the PR description.
 

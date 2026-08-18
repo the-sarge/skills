@@ -68,4 +68,4 @@ Do not claim minutes are saved merely because YAML parses; state which jobs no l
 
 ## Deliver
 
-State: mode completed; files or settings changed; validation performed and unavailable validation; expected runner-minute effect (draft phase runs nothing; docs-only PRs run `docs-check` only); required operator follow-up; remaining exceptions.
+State: mode completed; files or settings changed; validation performed and unavailable validation; expected runner-minute effect (no `ci-*` job runs during the draft phase — the workflow starts and every job is skipped; docs-only PRs run `docs-check` only); required operator follow-up; remaining exceptions.
