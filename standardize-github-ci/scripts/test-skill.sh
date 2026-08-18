@@ -25,7 +25,20 @@ for tool in yq jq rg git; do
 done
 
 tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
+# Fail closed on an early exit. bash 3.2 runs the EXIT trap with `$?` already
+# reset to 0 after a `set -u` abort, so the status alone cannot be trusted;
+# `completed` is set only on the last line of the file.
+completed=0
+cleanup() {
+  cleanup_rc=$?
+  rm -rf "$tmp"
+  if test "$cleanup_rc" -eq 0 && test "$completed" -ne 1; then
+    printf 'error: test harness exited before the end\n' >&2
+    cleanup_rc=1
+  fi
+  exit "$cleanup_rc"
+}
+trap cleanup EXIT
 
 # --- assets
 
@@ -248,6 +261,126 @@ mutate CI-PIN '.jobs["ci-required"].steps = ["task ci"]'
 expect_deviation "$out" CI-TARGET
 expect_report "$out"
 
+# other workflows must not use pull_request / pull_request_target
+other="$tmp/other"
+make_conformant_repo "$other"
+cat > "$other/.github/workflows/deep-ci.yml" <<'YAML'
+name: deep-ci
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+jobs:
+  race:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - run: task race
+YAML
+git -C "$other" add . && git -C "$other" commit -qm deep
+run_audit "$other"; out="$audit_out"
+test "$audit_rc" -eq 0 || fail "audit: scheduled non-required workflow must be conformant:
+$out"
+printf '%s\n' "$out" | rg -Fq '`deep-ci.yml`' || fail 'audit: must list other workflows'
+
+cat > "$other/.github/workflows/preflight.yml" <<'YAML'
+name: preflight
+on: [pull_request]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: task lint
+YAML
+git -C "$other" add . && git -C "$other" commit -qm preflight
+run_audit "$other"; out="$audit_out"
+test "$audit_rc" -eq 3 || fail 'audit: pull_request on a non-required workflow must exit 3'
+expect_deviation "$out" WF-PR-TRIGGER
+expect_deviation "$out" WF-TIMEOUT
+expect_deviation "$out" WF-PIN
+
+cat > "$other/.github/workflows/preflight.yml" <<'YAML'
+name: preflight
+on:
+  pull_request_target:
+    types: [labeled]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: 'true'
+YAML
+git -C "$other" add . && git -C "$other" commit -qm target
+run_audit "$other"; out="$audit_out"
+expect_deviation "$out" WF-PR-TRIGGER
+
+# Taskfile and classifier presence
+tf="$tmp/taskfile"
+make_conformant_repo "$tf"
+yq -i 'del(.tasks.ci)' "$tf/Taskfile.yml"
+git -C "$tf" commit -qam noci
+run_audit "$tf"; out="$audit_out"
+expect_deviation "$out" TASK-CI-MISSING
+yq -i 'del(.tasks.check) | del(.tasks["docs-check"])' "$tf/Taskfile.yml"
+git -C "$tf" commit -qam nolanes
+run_audit "$tf"; out="$audit_out"
+expect_deviation "$out" TASK-CHECK-MISSING
+expect_deviation "$out" TASK-DOCS-CHECK-MISSING
+git -C "$tf" rm -q scripts/ci-classify.sh && git -C "$tf" commit -qm noclassify
+run_audit "$tf"; out="$audit_out"
+expect_deviation "$out" CLASSIFY-MISSING
+
+lanetf="$tmp/lanetf"
+make_conformant_repo "$lanetf"
+yq -i '.jobs["ci-fuzz"] = .jobs["ci-required"] | .jobs["ci-fuzz"].steps[-1].run = "task ci-fuzz"' "$lanetf/.github/workflows/ci.yml"
+git -C "$lanetf" commit -qam lane
+run_audit "$lanetf"; out="$audit_out"
+expect_deviation "$out" TASK-LANE-MISSING
+
+# ruleset from JSON
+good_rules="$tmp/rules-good.json"
+cat > "$good_rules" <<'JSON'
+[
+  {"type":"deletion","ruleset_id":1},
+  {"type":"non_fast_forward","ruleset_id":1},
+  {"type":"pull_request","ruleset_id":1,"parameters":{"allowed_merge_methods":["squash"],"required_approving_review_count":0}},
+  {"type":"required_status_checks","ruleset_id":1,"parameters":{"strict_required_status_checks_policy":true,"required_status_checks":[{"context":"ci-required","integration_id":15368}]}}
+]
+JSON
+run_audit "$conf" CI_AUDIT_RULESET_JSON="$good_rules"; out="$audit_out"
+test "$audit_rc" -eq 0 || fail "audit: good ruleset must be conformant:
+$out"
+printf '%s\n' "$out" | rg -Fq 'Default-branch rules' || fail 'audit: must report rules section'
+
+bad_rules="$tmp/rules-bad.json"
+cat > "$bad_rules" <<'JSON'
+[
+  {"type":"pull_request","ruleset_id":1,"parameters":{"allowed_merge_methods":["merge","squash","rebase"]}},
+  {"type":"required_status_checks","ruleset_id":1,"parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"Verify","integration_id":15368}]}}
+]
+JSON
+run_audit "$conf" CI_AUDIT_RULESET_JSON="$bad_rules"; out="$audit_out"
+test "$audit_rc" -eq 3 || fail 'audit: bad ruleset must exit 3'
+expect_deviation "$out" RULES-CHECKS
+expect_deviation "$out" RULES-STRICT
+expect_deviation "$out" RULES-SQUASH
+expect_deviation "$out" RULES-DELETION
+expect_deviation "$out" RULES-FF
+
+# two-lane repo: rules must require both contexts
+run_audit "$lane" CI_AUDIT_RULESET_JSON="$good_rules"; out="$audit_out"
+expect_deviation "$out" RULES-CHECKS
+
+# empty rules array: no PR rule and no checks
+printf '[]\n' > "$tmp/rules-empty.json"
+run_audit "$conf" CI_AUDIT_RULESET_JSON="$tmp/rules-empty.json"; out="$audit_out"
+expect_deviation "$out" RULES-PR
+expect_deviation "$out" RULES-CHECKS
+
 # --- docs
 
+completed=1
 printf 'skill fixtures passed\n'

@@ -117,6 +117,120 @@ else
   printf '\n'
 fi
 
+# --- other workflows
+# Same tolerance as the required workflow: an unparseable or oddly-shaped
+# document is reported and skipped rather than aborting the run.
+printf '## Other workflows\n\n'
+other_count=0
+if test -d "$workflow_dir"; then
+  while IFS= read -r wf_path; do
+    test -n "$wf_path" || continue
+    test "$wf_path" != "$ci_yml" || continue
+    other_count=$((other_count + 1))
+    rel="${wf_path#"$repo_root"/}"
+    base_name="$(basename "$wf_path")"
+    if ! owf="$(yq -o=json -I=0 '.' "$wf_path" 2>/dev/null)" || test -z "$owf"; then
+      printf -- '- `%s`: not parseable as YAML\n' "$base_name"
+      continue
+    fi
+    ojobs="$(printf '%s' "$owf" | jq -c '(.jobs? // {}) | if type=="object" then . else {} end' 2>/dev/null)" || ojobs=''
+    test -n "$ojobs" || ojobs='{}'
+    triggers="$(printf '%s' "$owf" | jq -r '.on | if type=="string" then . elif type=="array" then join(", ") elif type=="object" then (keys|join(", ")) else "none" end' 2>/dev/null)" || triggers=''
+    printf -- '- `%s`: triggers `%s`\n' "$base_name" "${triggers:-none}"
+    if printf '%s' "$owf" | jq -e '.on | if type=="string" then (.=="pull_request" or .=="pull_request_target") elif type=="array" then (index("pull_request")!=null or index("pull_request_target")!=null) elif type=="object" then (has("pull_request") or has("pull_request_target")) else false end' >/dev/null 2>&1; then
+      deviate WF-PR-TRIGGER "$rel: only ci.yml may use pull_request or pull_request_target; move this workflow to schedule, push tags, or workflow_dispatch"
+    fi
+    missing_timeouts="$(printf '%s' "$ojobs" | jq -r '[to_entries[] | select((.value | if type=="object" then .["timeout-minutes"] else null end) == null) | .key] | join(", ")' 2>/dev/null)" || missing_timeouts=''
+    if test -n "$missing_timeouts"; then
+      deviate WF-TIMEOUT "$rel: jobs missing timeout-minutes: $missing_timeouts"
+    fi
+    while IFS= read -r uses; do
+      test -n "$uses" || continue
+      printf '%s' "$uses" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(/[A-Za-z0-9_./-]+)?@[0-9a-f]{40}$' \
+        || deviate WF-PIN "$rel: unpinned action $uses"
+    done <<< "$(printf '%s' "$ojobs" | jq -r '.[] | (if type=="object" then (.steps? // []) else [] end) | (if type=="array" then . else [] end) | .[] | select(type=="object" and has("uses")) | .uses' 2>/dev/null || true)"
+  done <<< "$(find "$workflow_dir" -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) -print | sort)"
+fi
+if test "$other_count" -eq 0; then
+  printf -- '- None\n'
+fi
+printf '\n'
+
+# --- Taskfile and classifier
+printf '## Taskfile\n\n'
+taskfile="$(find "$repo_root" -maxdepth 1 -type f \( -iname 'taskfile.yml' -o -iname 'taskfile.yaml' \) -print -quit)"
+if test -z "$taskfile"; then
+  printf -- '- Missing\n'
+  deviate TASK-CI-MISSING 'Taskfile.yml: not found; the required workflow runs task ci'
+else
+  tasks_json="$(yq -o=json -I=0 '.tasks // {}' "$taskfile" 2>/dev/null)" || tasks_json=''
+  case "$tasks_json" in '{'*) ;; *) tasks_json='{}' ;; esac
+  has_task() { printf '%s' "$tasks_json" | jq -e --arg t "$1" 'has($t)' >/dev/null 2>&1; }
+  for t in ci check docs-check; do
+    if has_task "$t"; then printf -- '- `%s`: present\n' "$t"; else printf -- '- `%s`: missing\n' "$t"; fi
+  done
+  has_task ci || deviate TASK-CI-MISSING "$(basename "$taskfile"): task ci is required"
+  has_task check || deviate TASK-CHECK-MISSING "$(basename "$taskfile"): task check is required"
+  has_task docs-check || deviate TASK-DOCS-CHECK-MISSING "$(basename "$taskfile"): task docs-check is required"
+  while IFS= read -r job; do
+    test -n "$job" || continue
+    case "$job" in
+      ci-required) ;;
+      ci-*) has_task "$job" || deviate TASK-LANE-MISSING "$(basename "$taskfile"): task $job is required by job $job" ;;
+    esac
+  done <<< "${job_names:-}"
+fi
+if test -x "$repo_root/scripts/ci-classify.sh"; then
+  printf -- '- `scripts/ci-classify.sh`: present\n'
+else
+  printf -- '- `scripts/ci-classify.sh`: missing\n'
+  deviate CLASSIFY-MISSING 'scripts/ci-classify.sh: missing or not executable; copy it from the skill assets'
+fi
+printf '\n'
+
+# --- default-branch rules
+printf '## Default-branch rules\n\n'
+rules_json=""
+rules_source='not checked (set CI_AUDIT_RULESET=live or CI_AUDIT_RULESET_JSON=<file>)'
+legacy_protection=unknown
+if test -n "${CI_AUDIT_RULESET_JSON:-}"; then
+  rules_json="$(cat "$CI_AUDIT_RULESET_JSON" 2>/dev/null)" || {
+    printf 'error: cannot read CI_AUDIT_RULESET_JSON: %s\n' "$CI_AUDIT_RULESET_JSON" >&2
+    exit 2
+  }
+  rules_source="\`$CI_AUDIT_RULESET_JSON\`"
+elif test "${CI_AUDIT_RULESET:-}" = live; then
+  require_command gh
+  origin_url="$(git -C "$repo_root" remote get-url origin 2>/dev/null || true)"
+  slug="$(printf '%s' "$origin_url" | sed -E 's#^(https://github.com/|git@github.com:)##; s#\.git$##')"
+  default_branch="$(gh api "repos/$slug" --jq .default_branch)"
+  rules_json="$(gh api "repos/$slug/rules/branches/$default_branch")"
+  rules_source="live \`$slug\` \`$default_branch\`"
+  if gh api "repos/$slug/branches/$default_branch/protection" >/dev/null 2>&1; then
+    legacy_protection=present
+  else
+    legacy_protection=absent
+  fi
+fi
+printf -- '- Source: %s\n' "$rules_source"
+if test -n "$rules_json"; then
+  r() { printf '%s' "$rules_json" | jq -e "$1" >/dev/null 2>&1; }
+  r 'any(.[]; .type=="pull_request")' || deviate RULES-PR 'default branch: a pull_request rule is required (no direct pushes)'
+  r 'any(.[]; .type=="pull_request" and (.parameters.allowed_merge_methods // []) == ["squash"])' || deviate RULES-SQUASH 'default branch: allowed merge methods must be exactly [squash]'
+  r 'any(.[]; .type=="deletion")' || deviate RULES-DELETION 'default branch: deletion must be blocked'
+  r 'any(.[]; .type=="non_fast_forward")' || deviate RULES-FF 'default branch: force pushes must be blocked'
+  r 'any(.[]; .type=="required_status_checks" and .parameters.strict_required_status_checks_policy==true)' || deviate RULES-STRICT 'default branch: required status checks must be strict (branch up to date)'
+  expected_contexts="$(printf '%s\n' "${job_names:-}" | { grep -E '^ci-' || true; } | sort | jq -R . | jq -sc .)"
+  actual_contexts="$(printf '%s' "$rules_json" | jq -c '[.[] | select(.type=="required_status_checks") | .parameters.required_status_checks[]? | .context] | sort' 2>/dev/null)" || actual_contexts=''
+  test -n "$actual_contexts" || actual_contexts='[]'
+  printf -- '- Required contexts: expected `%s`, actual `%s`\n' "$expected_contexts" "$actual_contexts"
+  test "$expected_contexts" = "$actual_contexts" || deviate RULES-CHECKS "default branch: required status checks must be exactly the ci-* jobs $expected_contexts (actual $actual_contexts)"
+  if test "$legacy_protection" = present; then
+    deviate RULES-LEGACY 'default branch: legacy branch protection is present; replace it with the ruleset'
+  fi
+fi
+printf '\n'
+
 # --- deviations
 printf '## Deviations\n\n'
 if test -z "$deviations"; then
