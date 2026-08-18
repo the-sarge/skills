@@ -48,15 +48,22 @@ printf -- '- HEAD: `%s`\n' "$(git -C "$repo_root" rev-parse --short HEAD)"
 printf -- '- Origin: `%s`\n\n' "$(git -C "$repo_root" remote get-url origin 2>/dev/null || printf 'none')"
 
 # --- required workflow
+# Every check below tolerates a malformed workflow: `.jobs`, each job body, and
+# each step list are normalized to the expected type before they are inspected,
+# and jq stderr is discarded. An odd document therefore yields deviations and a
+# complete report rather than a jq error, a truncated report, and an exit status
+# outside the 0/2/3 contract.
 workflow_dir="$repo_root/.github/workflows"
 ci_yml="$workflow_dir/ci.yml"
 required_jobs=""
 printf '## Required workflow `.github/workflows/ci.yml`\n\n'
 if ! test -f "$ci_yml"; then
   printf -- '- Missing\n\n'
-  deviate CI-MISSING '.github/workflows/ci.yml: required workflow not found'
+  deviate CI-MISSING 'ci.yml: required workflow not found'
+elif ! wf="$(yq -o=json -I=0 '.' "$ci_yml" 2>/dev/null)"; then
+  printf -- '- Present but not parseable as YAML\n\n'
+  deviate CI-MISSING 'ci.yml: not parseable as YAML'
 else
-  wf="$(yq -o=json -I=0 '.' "$ci_yml")"
   j() { printf '%s' "$wf" | jq -e "$1" >/dev/null 2>&1; }
 
   j '(.on|type=="object") and (.on|keys)==["pull_request"] and (.on.pull_request|type=="object") and (.on.pull_request|keys)==["types"] and ((.on.pull_request.types|sort)==["opened","ready_for_review","reopened","synchronize"])' \
@@ -68,7 +75,7 @@ else
   j '(.jobs|type=="object") and (.jobs|has("ci-required"))' \
     || deviate CI-JOBS 'ci.yml: job ci-required is required'
 
-  job_names="$(printf '%s' "$wf" | jq -r '.jobs // {} | keys_unsorted[]')"
+  job_names="$(printf '%s' "$wf" | jq -r '(.jobs? // {} | if type=="object" then . else {} end) | keys_unsorted[]' 2>/dev/null || true)"
   while IFS= read -r job; do
     test -n "$job" || continue
     case "$job" in
@@ -77,29 +84,36 @@ else
       *) deviate CI-JOB-NAME "ci.yml: job $job must be named ci-required or ci-<lane>"; continue ;;
     esac
     required_jobs="${required_jobs:+$required_jobs, }\`$job\`"
-    jj() { printf '%s' "$wf" | jq -e --arg job "$job" ".jobs[\$job] | $1" >/dev/null 2>&1; }
+    jobjson="$(printf '%s' "$wf" | jq -c --arg job "$job" '.jobs[$job] | if type=="object" then . else {} end' 2>/dev/null)" || jobjson=''
+    test -n "$jobjson" || jobjson='{}'
+    stepsjson="$(printf '%s' "$jobjson" | jq -c '(.steps? // []) | if type=="array" then . else [] end' 2>/dev/null)" || stepsjson=''
+    test -n "$stepsjson" || stepsjson='[]'
+    jj() { printf '%s' "$jobjson" | jq -e "$1" >/dev/null 2>&1; }
+    js() { printf '%s' "$stepsjson" | jq -e "$1" >/dev/null 2>&1; }
     jj '(.if|type=="string") and (.if|contains("!github.event.pull_request.draft")) and (.if|contains("github.event.pull_request.head.repo.full_name == github.repository"))' \
       || deviate CI-GUARD "ci.yml: job $job must guard with !github.event.pull_request.draft && head.repo.full_name == github.repository"
     jj '.["timeout-minutes"]|type=="number"' \
       || deviate CI-TIMEOUT "ci.yml: job $job must set timeout-minutes"
     jj 'has("needs")|not' \
       || deviate CI-NEEDS "ci.yml: job $job must not declare needs; required jobs are independent"
-    jj '(.strategy.matrix // null) == null' \
+    jj '(has("strategy")|not) or ((.strategy|type=="object") and (.strategy.matrix == null))' \
       || deviate CI-MATRIX "ci.yml: job $job must not use a matrix; route by job, not by matrix"
-    printf '%s' "$wf" | jq -e --arg job "$job" --arg t "$target" '[.jobs[$job].steps[]? | select(has("run")) | .run] == [$t]' >/dev/null 2>&1 \
+    printf '%s' "$stepsjson" | jq -e --arg t "$target" '[.[] | select(type=="object" and has("run")) | .run] == [$t]' >/dev/null 2>&1 \
       || deviate CI-TARGET "ci.yml: job $job must run exactly one step: $target"
+    jj '(.steps? // []) | (type=="array") and all(type=="object")' \
+      || deviate CI-PIN "ci.yml: job $job has a step that is not a mapping; every step must be a run step or a SHA-pinned uses step"
     while IFS= read -r uses; do
       test -n "$uses" || continue
       printf '%s' "$uses" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(/[A-Za-z0-9_./-]+)?@[0-9a-f]{40}$' \
         || deviate CI-PIN "ci.yml: job $job uses unpinned action $uses"
-    done <<< "$(printf '%s' "$wf" | jq -r --arg job "$job" '.jobs[$job].steps[]? | select(has("uses")) | .uses')"
-    printf '%s' "$wf" | jq -e --arg job "$job" '[.jobs[$job].steps[]? | select((.uses // "") | startswith("actions/checkout@")) | .with["fetch-depth"]] | length > 0 and all(. == 0)' >/dev/null 2>&1 \
+    done <<< "$(printf '%s' "$stepsjson" | jq -r '.[] | select(type=="object" and has("uses")) | .uses' 2>/dev/null || true)"
+    js '[.[] | select(type=="object" and ((.uses? // "") | type=="string") and ((.uses? // "") | startswith("actions/checkout@"))) | ((.with? // {}) | if type=="object" then .["fetch-depth"] else null end)] | length > 0 and all(. == 0)' \
       || deviate CI-FETCH-DEPTH "ci.yml: job $job must check out with fetch-depth: 0"
   done <<< "$job_names"
 
   printf -- '- Required jobs: %s\n' "${required_jobs:-none}"
   printf -- '- Runners:\n'
-  printf '%s' "$wf" | jq -r '.jobs // {} | to_entries[] | "  - `\(.key)` = `\(.value["runs-on"] | tostring)`"'
+  printf '%s' "$wf" | jq -r '(.jobs? // {} | if type=="object" then . else {} end) | to_entries[] | "  - `\(.key)` = `\((.value | if type=="object" then .["runs-on"] else null end) | tostring)`"' 2>/dev/null || true
   printf '\n'
 fi
 

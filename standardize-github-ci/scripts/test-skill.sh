@@ -225,6 +225,29 @@ run_audit "$nowf"; out="$audit_out"
 test "$audit_rc" -eq 3 || fail 'audit: missing ci.yml must exit 3'
 expect_deviation "$out" CI-MISSING
 
+# malformed or oddly-shaped ci.yml must still honour the exit contract and finish the report
+expect_report() { # output
+  printf '%s\n' "$1" | rg -Fq '## Deviations' || fail "audit: report must reach the Deviations section; got:
+$1"
+}
+
+broken="$tmp/broken-yaml"
+make_conformant_repo "$broken"
+printf 'on: [\n' > "$broken/.github/workflows/ci.yml"
+run_audit "$broken"; out="$audit_out"
+test "$audit_rc" -eq 3 || fail "audit: unparseable ci.yml must exit 3; got $audit_rc:
+$out"
+expect_deviation "$out" CI-MISSING
+expect_report "$out"
+
+mutate CI-JOBS '.jobs = "hello"'
+expect_report "$out"
+mutate CI-GUARD '.jobs["ci-required"] = "foo"'
+expect_report "$out"
+mutate CI-PIN '.jobs["ci-required"].steps = ["task ci"]'
+expect_deviation "$out" CI-TARGET
+expect_report "$out"
+
 # --- docs
 
 printf 'skill fixtures passed\n'
