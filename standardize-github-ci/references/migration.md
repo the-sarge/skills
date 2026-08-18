@@ -24,7 +24,7 @@ Produce, per repository: the mapping from old jobs to `ci-required` / `ci-<lane>
 
 ## 4. Bootstrap warning
 
-Opening the migration PR while the old default-branch workflow still owns `pull_request` may start one last automatic run of the old workflow. Tell the operator before pushing and obtain an OK either to let it finish or to cancel it. Never silently spend or cancel Actions minutes.
+Opening the migration PR may start one last automatic run of an old workflow, but only from a trigger the branch cannot switch off. For `pull_request` GitHub reads the workflow definition from the PR's merge ref, so an old `pull_request` workflow the branch deletes does not run; what can still start is a base-branch `push` or `pull_request_target` workflow, or an old `pull_request` workflow the branch keeps. Tell the operator before pushing and obtain an OK either to let it finish or to cancel it. Never silently spend or cancel Actions minutes.
 
 ## 5. Open the migration PR as a draft
 

@@ -24,7 +24,7 @@ Before planning, inspect any supplied issue. When given an OmniFocus task, use `
 
 ### 2. For each PR
 
-1. Implement the PR's work — use the `tdd` skill where appropriate — then push and open the PR.
+1. Implement the PR's work — use the `tdd` skill where appropriate — then push and open the PR as a draft (`gh pr create --draft`).
 2. Run the shared review loop's [review briefing](../_shared/REVIEW-LOOP.md#review-briefing) and [bounded review algorithm](../_shared/REVIEW-LOOP.md#bounded-review-algorithm).
 3. Run every planned stress gate, push the final candidate, and then run the repository's final local exact-head certification. If it exposes `task preflight`, run it and retain its exact head/base receipt; otherwise run and record the repository's documented local equivalents against the exact SHA. Any later candidate change invalidates this receipt and returns the PR to review before a new certification, except the shared protocol's docs-only polish exemption: run its lightweight docs checks and generate a new local certification without another RAS review.
 4. Mark the draft PR ready so the required `ci-*` checks run on that same head, verify the live PR head has not moved, and confirm every required check succeeded before merge (a post-ready `ci` run with conclusion `success`; a draft-phase `skipped` check is not evidence). Do not blindly rerun a failed unchanged head: diagnose it first; fix repository failures and return to review, and allow a same-head rerun only for a demonstrated external infrastructure failure.
