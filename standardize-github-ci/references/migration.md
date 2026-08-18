@@ -1,73 +1,64 @@
-# CI Migration Guide
+# CI Migration Checklist
 
-## Required planning questions
+Migrate one repository at a time to the [portfolio CI standard](ci-policy.md). Every step below is either read-only, a change on the migration branch, or an explicitly authorized external mutation.
 
-Answer these before implementation:
+## 1. Inventory (read-only)
 
-1. Which check names are currently required?
-2. Are direct pushes to the default branch possible?
-3. Which documentation is generated from code?
-4. Does the repository contain cgo, OS-specific files, GUI code, installers, or native libraries?
-5. Which private dependencies, credentials, or self-hosted runners are required?
-6. Which checks detect time-varying external risk?
-7. Which jobs publish, deploy, sign, attest, comment, or otherwise mutate external state?
-8. What recent changes produced unnecessary runs, and what would the proposed classifier do with them?
-9. Is RAS the pre-merge review gate, what constitutes a blocker-free result, and how is the reviewed head SHA recorded?
-10. Can `workflow_dispatch` or an equivalent operator trigger produce a required result on a same-repository PR head that the live PR status rollup and ruleset actually credit, or is a generic commit-status bridge required?
-11. Does the repository trust the agent/operator and same-repository branch writers, or does it explicitly require protection from malicious branch-controlled workflow changes?
-12. Does `base_sha` mean the current default-branch tip, the PR merge base, or a merge-queue synthetic SHA, and which changes invalidate prior review/CI?
-13. Is a merge queue enabled, and if so how does its synthetic SHA interact with exact-head validation and merge?
+1. Run `scripts/audit-ci.sh <repo>` and, when `gh` can read the repository, `CI_AUDIT_RULESET=live scripts/audit-ci.sh <repo>`. Keep the deviation list; it is the work list.
+2. List every workflow and every job's Taskfile target(s). For each lane decide: merge-blocking today → `ci-required` (fold into `task check`) or its own `ci-<lane>` job; not merge-blocking → a non-required workflow on `schedule`, `push: tags`, or `workflow_dispatch`.
+3. Record the current required check names and whether the default branch uses a ruleset or legacy branch protection (`gh api repos/<o>/<r>/rules/branches/<default>`, `gh api repos/<o>/<r>/branches/<default>/protection`).
+4. Record which jobs run on self-hosted labels; those labels move to `runs-on` of the corresponding `ci-*` job.
 
-## Minimal agent-gated migration
+## 2. Plan (no edits)
 
-Use this pattern when the agent runs RAS or another review process before paid CI and the user has not requested a more elaborate integration. GitHub does not need to know which review tool was used or what verdict it produced:
+Produce, per repository: the mapping from old jobs to `ci-required` / `ci-<lane>` / non-required workflows; the `runs-on` per job; the `task check` and `task docs-check` bodies (existing lanes renamed, not rewritten); any `CI_DOCS_GLOBS` extension; the ruleset diff including any `ci-<lane>` contexts to add; and the bootstrap note below.
 
-1. Preserve the stable required check and its result aggregation.
-2. Remove automatic open and synchronize certification from `pull_request` and `pull_request_target`; remove event-specific branches that become unreachable.
-3. Preserve or add `workflow_dispatch` with a full or otherwise fail-closed validation mode. Use generic `expected_sha` and `base_sha` inputs plus an early equality check when practical; regardless, the agent must inspect the resulting run's head SHA before accepting it. Do not assume a dispatched job check satisfies a PR ruleset: verify the PR status rollup, and if necessary publish a generic required commit status as pending after binding and success or failure after aggregate evaluation. Give the dispatch aggregate check a different display name from the required status context.
-4. Keep automatic PR preflight separate and non-required if repository evidence justifies it. Do not let skipped certification jobs report success before the agent requests CI.
-5. By default, the agent captures the exact PR head and current default-branch tip, runs and resolves RAS outside GitHub, rechecks both live SHAs, dispatches CI on the same-repository PR branch, inspects the run and required check, rechecks the PR head/base, and merges with an exact-head guard. A new PR commit or default-branch advance invalidates the prior decision and CI result unless the repository explicitly documents and tests merge-base or merge-queue semantics.
-6. Keep complete default-branch validation until rulesets prohibit direct pushes; then consider reducing the post-merge run separately.
+## 3. Apply (on a feature branch, after approval)
 
-The expected-SHA guard prevents accidental branch movement; it is not evidence that RAS ran or passed and must not be described as such in workflow state. Under the default trusted-agent/operator model, branch-local workflow code is acceptable. If the user explicitly requires protection from malicious same-repository branch writers, stop and separately design a trusted controller or dedicated check publisher rather than silently changing the architecture.
+1. Copy `assets/ci.yml` to `.github/workflows/ci.yml`; set `runs-on`; add `ci-<lane>` jobs by duplicating `ci-required` and changing only the job name, `runs-on`, `timeout-minutes`, and the `task ci-<lane>` step.
+2. Copy `assets/ci-classify.sh` to `scripts/ci-classify.sh` unchanged and make it executable.
+3. Merge `assets/Taskfile.ci.yml` into `Taskfile.yml`: add `ci`, `docs-check`, `check`, and one `ci-<lane>` per extra job; point `check` and `docs-check` at the repository's existing commands.
+4. Remove `pull_request` and `pull_request_target` from every other workflow; delete workflows that only existed to certify PRs (dispatch/label/status-bridge workflows). Keep deep, security, fuzz, cross-platform, and release workflows on their non-PR triggers, pinned and with timeouts.
+5. Run `task ci` locally on the branch (expect the docs-only or full path as appropriate) and `scripts/audit-ci.sh .` (expect `- None. Repository conforms to the standard.` apart from `RULES-*`, which is checked live).
+6. Commit. Do not open the PR yet.
 
-Adapt this operator handoff to the repository's workflow and inputs:
+## 4. Bootstrap warning
+
+Opening the migration PR while the old default-branch workflow still owns `pull_request` may start one last automatic run of the old workflow. Tell the operator before pushing and obtain an OK either to let it finish or to cancel it. Never silently spend or cancel Actions minutes.
+
+## 5. Open the migration PR as a draft
 
 ```sh
-gh workflow run <certifying-workflow> --ref <same-repository-pr-branch> -f expected_sha=<exact-pr-head> -f base_sha=<exact-default-branch-head>
+git push -u origin <branch>
+gh pr create --draft --title "ci: adopt portfolio CI standard" --body "<summary of the mapping>"
 ```
 
-After dispatch, inspect the run and check suite, re-read the live PR head, and merge only the exact requested head, for example with `gh pr merge --match-head-commit <exact-pr-head>`.
+While the PR is a draft, no `ci.yml` job runs on it (the new workflow file is on the branch, but the guard skips drafts; the old default-branch workflow may still run, see §4).
 
-When dispatch cannot satisfy the required PR rollup, adapt this one-shot label handoff instead:
+## 6. Apply the ruleset (external mutation, needs explicit authorization)
 
-```sh
-gh pr edit <pr-number> --repo <owner/repository> --add-label <certification-label>
-```
+1. Edit a copy of `assets/ruleset.json` to list every `ci-*` job as a required check.
+2. Create it: `gh api --method POST repos/<o>/<r>/rulesets --input <copy>.json`. If a ruleset for the default branch already exists, `gh api repos/<o>/<r>/rulesets` to find its id and `--method PUT repos/<o>/<r>/rulesets/<id>` instead.
+3. Remove legacy branch protection when present: `gh api --method DELETE repos/<o>/<r>/branches/<default>/protection`.
+4. Re-run `CI_AUDIT_RULESET=live scripts/audit-ci.sh .` and expect no `RULES-*` deviations.
 
-The label and workflow must be generic CI coordination with no RAS meaning. The workflow must subscribe only to the `labeled` PR activity, reject unrelated labels, remove the certification label before checkout, and re-read the live PR to bind its head, base, repositories, and synthetic merge SHA to the event. Demonstrate on one representative live source PR and one documentation PR that open and synchronize start no run, the label is revoked, and the stable required check appears in the PR rollup.
+Until the migration PR merges, the *old* required check names may still be referenced by open PRs; that is expected and resolves as they update.
 
-Task is an optional agent interface, not a GitHub-side RAS gate. A target such as `task validate-pr PR=<n>` may capture the head, run RAS, inspect structured synthesis, recheck the live head, dispatch CI, inspect the run, and merge the same head, but must not request CI merely because `ras review` exited zero.
+## 7. Verify on the migration PR (this is the live test of GitHub behavior)
 
-Do not add labels, webhooks, repository-dispatch integrations, or statuses to communicate the review tool or verdict. A generic required commit-status publisher is permitted when live repository evidence shows that GitHub does not credit dispatched job checks; it must report CI progress/result only, use least-privilege `statuses: write`, link to the dispatched run, use a context distinct from the dispatch aggregate check name, guard terminal publication against cancellation, and fail closed. Because cancellation can race with an already-started status request, reject every cancelled run regardless of visible status. If cancellation leaves pending, follow the workflow run with a bounded wait and request fresh exact-head CI; never convert pending to success for convenience. A persistent operator label is insufficient unless automation revokes it or otherwise SHA-binds it.
+1. Draft: `gh pr view --json mergeable,mergeStateStatus` shows the PR is not mergeable while draft, and `gh run list --workflow ci.yml --branch <branch>` shows no run from the new workflow.
+2. `gh pr ready`. Expect a `ci` run whose head SHA equals `gh pr view --json headRefOid`. Expect every `ci-*` check to appear in `gh pr checks`.
+3. Push a docs-only commit (for example a line in `DEV-JOURNAL.md` or `docs/`). Expect the run's `ci-required` log to show `task docs-check` ran and no `task check`.
+4. Push a source commit. Expect `task check` to run.
+5. If possible, land an unrelated change on the default branch and confirm `gh pr view --json mergeStateStatus` becomes `BEHIND` and the merge button is blocked until `gh pr update-branch` (or a rebase) re-runs CI.
+6. Confirm the merge is blocked while any `ci-*` check is pending or failed.
 
-## Bootstrap
+Record head SHAs, run ids, and check names for each observation in the PR description.
 
-The migration PR is created while the old default-branch workflow still controls `pull_request`, so opening it may start one last automatic CI run. Before pushing or opening the PR, tell the user and obtain authority either to let that bootstrap run finish or, when the current default-branch workflow already supports dispatch, to cancel it, complete RAS, and dispatch final certification manually. A newly added `workflow_dispatch` trigger generally cannot bootstrap itself before its workflow exists on the default branch. Do not silently spend or cancel Actions minutes.
+## 8. Merge
 
-Existing open PR heads may retain successful required checks produced before the migration. Treat those checks as CI evidence only; enforce the agent-reviewed-current-head policy operationally during rollout.
+`gh pr merge --squash --match-head-commit <live-head-sha>`. Then run the repository's usual post-merge steps (journal, tracking).
 
-## Rollout and observation
+## Rollback
 
-1. Record the baseline workflow/job count and available usage data.
-2. Implement on a feature branch with existing required checks preserved where possible.
-3. For agent-gated repositories, verify that PR open/synchronize starts no certifying workflow, then manually validate a docs-only head and a source head after the agent decides each is ready.
-4. Change required checks only with explicit authorization after observing actual check names.
-5. Observe failures, queue time, and billing for at least several normal development cycles.
-6. Tighten path categories only from evidence; fail closed when uncertain.
-7. Record the agent-reviewed SHA, dispatched run SHA, required check producer, check conclusion, live PR head before merge, and merged SHA for the first live validation.
-8. If dispatch cannot reliably produce a ruleset-credited required result, stop the rollout and repair the generic status bridge or choose another explicit agent-requested trigger. Restore the prior PR trigger only if that matches the user's requested operating model; never weaken or remove the required result merely to unblock merging.
-
-## Exceptions
-
-Document exceptions with the protected behavior, supporting evidence, and review condition. Examples include always scanning all files for secrets, rebuilding committed native libraries on every relevant change, or maintaining default-branch validation because direct pushes remain allowed.
+Restore the previous workflow files and required-check names from the pre-migration commit; rulesets can be updated with `--method PUT` to the previous check list. Never weaken or remove the required check merely to unblock a merge.

@@ -497,6 +497,15 @@ if rg -qi 'expected_sha|status bridge|ci:certify|ci-certify|workflow_dispatch.*c
   fail 'ci-policy.md: must not describe dispatch/label certification'
 fi
 
+migration="$skill_root/references/migration.md"
+rg -Fq 'gh pr ready' "$migration" || fail 'migration.md: must describe marking the PR ready'
+rg -Fq 'gh pr merge --squash --match-head-commit' "$migration" || fail 'migration.md: must describe the exact-head squash merge'
+rg -Fq 'assets/ruleset.json' "$migration" || fail 'migration.md: must apply the ruleset asset'
+rg -Fq 'gh pr create --draft' "$migration" || fail 'migration.md: must open the migration PR as a draft'
+if rg -qi 'expected_sha|ci:certify|ci-certify|status bridge' "$migration"; then
+  fail 'migration.md: must not describe dispatch/label certification'
+fi
+
 # New test sections belong above this line, under their own `# ---` marker;
 # nothing may follow `completed=1` but the success line.
 completed=1
