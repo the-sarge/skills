@@ -81,7 +81,7 @@ else
     case "$job" in
       ci-required) target='task ci' ;;
       ci-*) target="task $job" ;;
-      *) deviate CI-JOB-NAME "ci.yml: job $job is not part of the standard; delete it, or rename it to ci-required or ci-<lane> if it belongs in the required workflow"; continue ;;
+      *) deviate CI-JOB-NAME "ci.yml: job $job is not part of the standard; delete it, or fold its check into task check (ci-required) or into a new task ci-<lane> with its own ci-<lane> job if it must block merging; non-blocking work moves to a non-required workflow"; continue ;;
     esac
     required_jobs="${required_jobs:+$required_jobs, }\`$job\`"
     jobjson="$(printf '%s' "$wf" | jq -c --arg job "$job" '.jobs[$job] | if type=="object" then . else {} end' 2>/dev/null)" || jobjson=''
