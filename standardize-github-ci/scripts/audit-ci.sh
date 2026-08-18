@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
+# Read-only conformance audit of one repository against the portfolio CI standard
+# (standardize-github-ci/references/ci-policy.md).
+#
+# Usage: audit-ci.sh [repository-path]
+# Env:   CI_AUDIT_RULESET_JSON=<file>  audit default-branch rules from this JSON (array from
+#                                      GET /repos/{o}/{r}/rules/branches/{branch}) instead of GitHub
+#        CI_AUDIT_RULESET=live         query GitHub with gh for the default-branch rules
+# Exit:  0 conformant, 3 deviations found, 2 usage or tool error.
+#
 # shellcheck disable=SC2016
+# SC2016: single quotes are intentional throughout; they hold jq programs and
+#         literal GitHub Actions expression syntax, not shell expansions.
 set -euo pipefail
 
 repo_input="${1:-.}"
@@ -10,10 +21,8 @@ require_command() {
     exit 2
   fi
 }
-
 require_command git
 require_command jq
-require_command rg
 require_command yq
 
 repo_root="$(git -C "$repo_input" rev-parse --show-toplevel 2>/dev/null)" || {
@@ -21,328 +30,255 @@ repo_root="$(git -C "$repo_input" rev-parse --show-toplevel 2>/dev/null)" || {
   exit 2
 }
 
-relative_path() {
-  case "$1" in
-    "$repo_root"/*) printf '%s\n' "${1#"$repo_root"/}" ;;
-    *) printf '%s\n' "$1" ;;
-  esac
+deviations=""
+deviate() { # code, message
+  if test -z "$deviations"; then
+    deviations="- \`$1\` $2"
+  else
+    deviations="$deviations
+- \`$1\` $2"
+  fi
 }
 
-printf '# CI audit: %s\n\n' "$(basename "$repo_root")"
+# --- header
+printf '# CI conformance audit: %s\n\n' "$(basename "$repo_root")"
 printf -- '- Repository: `%s`\n' "$repo_root"
 printf -- '- Branch: `%s`\n' "$(git -C "$repo_root" branch --show-current 2>/dev/null || true)"
 printf -- '- HEAD: `%s`\n' "$(git -C "$repo_root" rev-parse --short HEAD)"
-printf -- '- Origin: `%s`\n' "$(git -C "$repo_root" remote get-url origin 2>/dev/null || printf 'none')"
-status_count="$(git -C "$repo_root" status --short | wc -l | tr -d ' ')"
-printf -- '- Worktree changes: `%s`\n' "$status_count"
+printf -- '- Origin: `%s`\n\n' "$(git -C "$repo_root" remote get-url origin 2>/dev/null || printf 'none')"
 
-case "${CI_USES_RAS:-}" in
-  true)
-    uses_ras=true
-    ras_source='CI_USES_RAS=true'
-    ;;
-  false)
-    uses_ras=false
-    ras_source='CI_USES_RAS=false'
-    ;;
-  "")
-    if test -f "$repo_root/.ras/config.yaml" || rg -qi --hidden --glob '!.git/**' 'ras[[:space:]]+(review|verify|review-fix|review-loop)|RAS[- ]first|RAS review' "$repo_root"; then
-      uses_ras=true
-      ras_source='repository evidence'
-    else
-      uses_ras=false
-      ras_source='not detected'
-    fi
-    ;;
-  *)
-    printf 'error: CI_USES_RAS must be true, false, or unset\n' >&2
-    exit 2
-    ;;
-esac
-printf -- '- RAS-first review gate: `%s` (%s)\n\n' "$uses_ras" "$ras_source"
-
-printf '## Build entry points\n\n'
-entry_points="$(find "$repo_root" -maxdepth 1 -type f \( -iname 'taskfile.yml' -o -iname 'taskfile.yaml' -o -name 'Makefile' -o -name 'Justfile' \) -print | sort)"
-entry_count=0
-while IFS= read -r entry_path; do
-  test -n "$entry_path" || continue
-  printf -- '- `%s`\n' "$(basename "$entry_path")"
-  entry_count=$((entry_count + 1))
-done <<< "$entry_points"
-if test "$entry_count" -eq 0; then
-  printf -- '- None found\n'
-fi
-
-taskfile="$(find "$repo_root" -maxdepth 1 -type f \( -iname 'taskfile.yml' -o -iname 'taskfile.yaml' \) -print -quit)"
-if test -n "$taskfile"; then
-  lane_tasks="$(yq -r '.tasks // {} | keys | .[] | select(test("(^|:)(docs(-check)?|check|verify|ci|deep(-check)?|race|vuln|security(-gate)?|release(-check)?)$"))' "$taskfile" 2>/dev/null || true)"
-  if test -n "$lane_tasks"; then
-    printf '\nCandidate validation tasks:\n\n'
-    while IFS= read -r task_name; do
-      test -n "$task_name" && printf -- '- `%s`\n' "$task_name"
-    done <<< "$lane_tasks"
-  fi
-fi
-
-printf '\n## Workflows\n\n'
+# --- required workflow
+# Every check below tolerates a malformed workflow: `.jobs`, each job body, and
+# each step list are normalized to the expected type before they are inspected,
+# and jq stderr is discarded. An odd document therefore yields deviations and a
+# complete report rather than a jq error, a truncated report, and an exit status
+# outside the 0/2/3 contract.
 workflow_dir="$repo_root/.github/workflows"
-if ! test -d "$workflow_dir"; then
-  printf 'No checked-in GitHub Actions workflows found.\n\n'
-  printf '## Policy signals\n\n- No workflow findings.\n'
-  exit 0
-fi
-
-workflow_list="$(find "$workflow_dir" -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) -print | sort)"
-if test -z "$workflow_list"; then
-  printf 'No checked-in GitHub Actions workflows found.\n\n'
-  printf '## Policy signals\n\n- No workflow findings.\n'
-  exit 0
-fi
-
-signals=""
-append_signal() {
-  if test -z "$signals"; then
-    signals="$1"
-  else
-    signals="$signals
-$1"
-  fi
-}
-
-trigger_state() {
-  workflow_file="$1"
-  trigger="$2"
-  on_json="$(yq -o=json -I=0 '.on // {}' "$workflow_file")"
-  if ! printf '%s\n' "$on_json" | jq -e --arg trigger "$trigger" '
-    if type == "string" then . == $trigger
-    elif type == "array" then index($trigger) != null
-    elif type == "object" then has($trigger)
-    else false
-    end
-  ' >/dev/null; then
-    printf 'absent\n'
-  elif printf '%s\n' "$on_json" | jq -e --arg trigger "$trigger" '
-    type == "object" and (.[$trigger] | type == "object") and ((.[$trigger] | has("paths")) or (.[$trigger] | has("paths-ignore")))
-  ' >/dev/null; then
-    printf 'filtered\n'
-  else
-    printf 'unfiltered\n'
-  fi
-}
-
-dispatch_sha_binding_state() {
-  workflow="$1"
-  sha_inputs="$(yq -r '(.on.workflow_dispatch.inputs // {}) | keys | .[]' "$workflow" | rg -i '(^|_)(expected|reviewed|head)?_?sha($|_)' || true)"
-  test -n "$sha_inputs" || {
-    printf 'not detected'
-    return
-  }
-
-  jobs_json="$(yq -o=json -I=0 '.jobs // {}' "$workflow")"
-  while IFS= read -r sha_input; do
-    test -n "$sha_input" || continue
-    if printf '%s\n' "$jobs_json" | rg -Fq "inputs.$sha_input" && printf '%s\n' "$jobs_json" | rg -q 'GITHUB_SHA|github\.sha'; then
-      printf 'detected; verify the comparison fails closed'
-      return
-    fi
-  done <<< "$sha_inputs"
-
-  printf 'not detected'
-}
-
-pull_request_activity_state() {
-  workflow="$1"
-  on_json="$(yq -o=json -I=0 '.on // {}' "$workflow")"
-  if ! printf '%s\n' "$on_json" | jq -e '
-    if type == "string" then . == "pull_request"
-    elif type == "array" then index("pull_request") != null
-    elif type == "object" then has("pull_request")
-    else false
-    end
-  ' >/dev/null; then
-    printf 'absent'
-  elif printf '%s\n' "$on_json" | jq -e '
-    type == "object" and
-    (.pull_request | type == "object") and
-    ((.pull_request.types // []) == ["labeled"])
-  ' >/dev/null; then
-    printf 'label-only operator trigger'
-  else
-    printf 'automatic updates'
-  fi
-}
-
-label_certification_state() {
-  workflow="$1"
-  activity_state="$(pull_request_activity_state "$workflow")"
-  test "$activity_state" = 'label-only operator trigger' || {
-    printf 'not detected'
-    return
-  }
-
-  jobs_json="$(yq -o=json -I=0 '.jobs // {}' "$workflow")"
-  if printf '%s\n' "$jobs_json" | rg -Fq 'github.event.label.name' &&
-    printf '%s\n' "$jobs_json" | rg -Fq 'github.event.pull_request.head.sha' &&
-    printf '%s\n' "$jobs_json" | rg -Fq 'github.event.pull_request.base.sha' &&
-    printf '%s\n' "$jobs_json" | rg -Fq 'github.sha' &&
-    printf '%s\n' "$jobs_json" | rg -Fq 'merge_commit_sha' &&
-    printf '%s\n' "$jobs_json" | rg -Fq 'head.repo.full_name' &&
-    printf '%s\n' "$jobs_json" | rg -Fq 'base.repo.full_name' &&
-    printf '%s\n' "$jobs_json" | rg -Fq -- '--method DELETE' &&
-    printf '%s\n' "$jobs_json" | rg -Fq '/labels/'; then
-    printf 'detected; verify label revocation and head/base/merge comparisons fail closed'
-  else
-    printf 'not detected; label-only trigger lacks complete binding evidence'
-  fi
-}
-
-dispatch_status_bridge_state() {
-  workflow="$1"
-  permissions_json="$(yq -o=json -I=0 '[.permissions.statuses // "", (.jobs // {} | to_entries[] | .value.permissions.statuses // "")]' "$workflow")"
-  jobs_json="$(yq -o=json -I=0 '.jobs // {}' "$workflow")"
-  if printf '%s\n' "$permissions_json" | rg -q '"write"' && printf '%s\n' "$jobs_json" | rg -Fq '/statuses/' && printf '%s\n' "$jobs_json" | rg -Fq 'ci-required'; then
-    printf 'detected; verify PR ruleset attribution live'
-  else
-    printf 'not detected'
-  fi
-}
-
-manual_workflow_count=0
-automatic_pr_workflow_count=0
-exact_head_dispatch_count=0
-label_certification_count=0
-status_bridge_count=0
-
-while IFS= read -r workflow; do
-  test -n "$workflow" || continue
-  rel="$(relative_path "$workflow")"
-  workflow_name="$(yq -r '.name // "unnamed"' "$workflow")"
-  job_count="$(yq -r '.jobs // {} | length' "$workflow")"
-  trigger_json="$(yq -o=json -I=0 '.on // {}' "$workflow")"
-  if test "$(yq -r 'has("concurrency")' "$workflow")" = true; then
-    concurrency_state=configured
-  else
-    concurrency_state=missing
-  fi
-  pr_state="$(trigger_state "$workflow" pull_request)"
-  pr_activity_state="$(pull_request_activity_state "$workflow")"
-  pr_target_state="$(trigger_state "$workflow" pull_request_target)"
-  push_state="$(trigger_state "$workflow" push)"
-  dispatch_state="$(trigger_state "$workflow" workflow_dispatch)"
-  missing_timeouts="$(yq -r '[.jobs // {} | to_entries[] | select(.value["timeout-minutes"] == null) | .key] | join(", ")' "$workflow")"
-  runners="$(yq -r '(.jobs // {}) | to_entries | .[] | "\(.key)=\(.value[\"runs-on\"] | @json)"' "$workflow")"
-
-  printf '### `%s` — %s\n\n' "$rel" "$workflow_name"
-  printf -- '- Jobs: `%s`\n' "$job_count"
-  printf -- '- Triggers: `%s`\n' "$trigger_json"
-  printf -- '- Pull request paths: `%s`\n' "$pr_state"
-  printf -- '- Pull request activity: `%s`\n' "$pr_activity_state"
-  printf -- '- Pull request target paths: `%s`\n' "$pr_target_state"
-  printf -- '- Push paths: `%s`\n' "$push_state"
-  if test "$dispatch_state" = absent; then
-    printf -- '- Manual dispatch: absent\n'
-  else
-    printf -- '- Manual dispatch: present\n'
-    manual_workflow_count=$((manual_workflow_count + 1))
-    dispatch_sha_binding="$(dispatch_sha_binding_state "$workflow")"
-    printf -- '- Exact-head dispatch binding: `%s`\n' "$dispatch_sha_binding"
-    if test "$dispatch_sha_binding" != 'not detected'; then
-      exact_head_dispatch_count=$((exact_head_dispatch_count + 1))
-    fi
-    dispatch_status_bridge="$(dispatch_status_bridge_state "$workflow")"
-    printf -- '- Generic commit-status bridge: `%s`\n' "$dispatch_status_bridge"
-    if test "$dispatch_status_bridge" != 'not detected'; then
-      status_bridge_count=$((status_bridge_count + 1))
-    fi
-  fi
-  label_certification="$(label_certification_state "$workflow")"
-  if test "$pr_activity_state" = 'label-only operator trigger'; then
-    printf -- '- Label-gated certification binding: `%s`\n' "$label_certification"
-    if test "$label_certification" = 'detected; verify label revocation and head/base/merge comparisons fail closed'; then
-      label_certification_count=$((label_certification_count + 1))
-    fi
-  fi
-  printf -- '- Concurrency: `%s`\n' "$concurrency_state"
-  if test -n "$missing_timeouts"; then
-    printf -- '- Jobs missing timeouts: `%s`\n' "$missing_timeouts"
-  else
-    printf -- '- Jobs missing timeouts: none\n'
-  fi
-  printf -- '- Runners:\n'
-  while IFS= read -r runner; do
-    test -n "$runner" && printf '  - `%s`\n' "$runner"
-  done <<< "$runners"
-  printf '\n'
-
-  if test "$concurrency_state" = missing && { test "$pr_state" != absent || test "$pr_target_state" != absent || test "$push_state" != absent; }; then
-    append_signal "WARN $rel: automatic workflow has no concurrency policy"
-  fi
-  if test -n "$missing_timeouts"; then
-    append_signal "WARN $rel: jobs missing timeout-minutes: $missing_timeouts"
-  fi
-  if test "$pr_state" = unfiltered && test "$pr_activity_state" != 'label-only operator trigger'; then
-    append_signal "REVIEW $rel: pull_request trigger is not path-filtered; use internal classification when the check is required"
-  fi
-  if test "$pr_target_state" != absent; then
-    append_signal "SECURITY $rel: pull_request_target requires explicit untrusted-code and secret-boundary review"
-  fi
-  if test "$pr_activity_state" = 'automatic updates' || test "$pr_target_state" != absent; then
-    automatic_pr_workflow_count=$((automatic_pr_workflow_count + 1))
-    if test "$uses_ras" = true; then
-      append_signal "RAS-COST $rel: automatically starts on pull request updates before the agent-side review gate settles; separate preflight or use dispatch-gated validation"
-    fi
-  fi
-  if test "$uses_ras" = true && test "$pr_activity_state" = 'label-only operator trigger' && test "$label_certification" != 'detected; verify label revocation and head/base/merge comparisons fail closed'; then
-    append_signal "RAS-BLOCKER $rel: label-only certification lacks one-shot revocation or exact head/base/merge binding evidence"
-  fi
-  if test "$push_state" = unfiltered; then
-    append_signal "REVIEW $rel: push trigger is not path-filtered; check for full PR plus merged-push duplication"
-  fi
-  if printf '%s\n' "$runners" | rg -qi 'macos|windows'; then
-    append_signal "COST $rel: uses macOS or Windows runners"
-  fi
-  if rg -q 'go test[[:space:]]+([^\n]*[[:space:]])?\./\.\.\.' "$workflow" && rg -q 'go test[[:space:]]+-race([^\n]*)?\./\.\.\.|go test([^\n]*)[[:space:]]-race([^\n]*)?\./\.\.\.' "$workflow"; then
-    append_signal "DUPLICATE $rel: contains both ordinary and race runs of ./..."
-  fi
-done <<< "$workflow_list"
-
-if test "$uses_ras" = true && test "$exact_head_dispatch_count" -eq 0 && test "$label_certification_count" -eq 0; then
-  if test "$manual_workflow_count" -eq 0; then
-    append_signal "RAS-BLOCKER repository: no operator-triggered exact-head certification path was detected"
-  else
-    append_signal "RAS-BLOCKER repository: operator-triggered certification exists but no exact-head binding evidence was detected"
-  fi
-elif test "$uses_ras" = true && test "$exact_head_dispatch_count" -gt 0 && test "$status_bridge_count" -eq 0; then
-  append_signal "RAS-VERIFY repository: exact-head dispatch has no generic commit-status bridge; GitHub may omit workflow_dispatch job checks from the PR required-status rollup, so prove live ruleset attribution before relying on it"
-fi
-
-printf '## Agent-side review sequencing\n\n'
-printf -- '- Automatic pull-request workflows: `%s`\n' "$automatic_pr_workflow_count"
-printf -- '- Manual-dispatch workflows: `%s`\n' "$manual_workflow_count"
-printf -- '- Exact-head dispatch candidates: `%s`\n' "$exact_head_dispatch_count"
-printf -- '- Label-gated certification candidates: `%s`\n' "$label_certification_count"
-printf -- '- Generic commit-status bridges: `%s`\n\n' "$status_bridge_count"
-
-printf '## Cross-file duplication signals\n\n'
-search_files=("$workflow_dir")
-if test -n "$taskfile"; then
-  search_files+=("$taskfile")
-fi
-govuln_refs="$({ rg -n --no-heading 'govulncheck' "${search_files[@]}" 2>/dev/null || true; } | wc -l | tr -d ' ')"
-race_refs="$({ rg -n --no-heading 'go test[^\n]*-race' "${search_files[@]}" 2>/dev/null || true; } | wc -l | tr -d ' ')"
-printf -- '- `govulncheck` references: `%s`\n' "$govuln_refs"
-printf -- '- race-test command references: `%s`\n' "$race_refs"
-if test "$govuln_refs" -gt 1; then
-  append_signal "DUPLICATE repository: multiple govulncheck references require intent review"
-fi
-
-printf '\n## Policy signals\n\n'
-if test -z "$signals"; then
-  printf -- '- No mechanical warnings. Perform semantic review before declaring the CI efficient.\n'
+ci_yml="$workflow_dir/ci.yml"
+required_jobs=""
+printf '## Required workflow `.github/workflows/ci.yml`\n\n'
+if ! test -f "$ci_yml"; then
+  printf -- '- Missing\n\n'
+  deviate CI-MISSING 'ci.yml: required workflow not found'
+elif ! wf="$(yq -o=json -I=0 '.' "$ci_yml" 2>/dev/null)"; then
+  printf -- '- Present but not parseable as YAML\n\n'
+  deviate CI-MISSING 'ci.yml: not parseable as YAML'
 else
-  while IFS= read -r signal; do
-    test -n "$signal" && printf -- '- %s\n' "$signal"
-  done <<< "$signals"
+  j() { printf '%s' "$wf" | jq -e "$1" >/dev/null 2>&1; }
+
+  j '(.on|type=="object") and (.on|keys)==["pull_request"] and (.on.pull_request|type=="object") and (.on.pull_request|keys)==["types"] and ((.on.pull_request.types|sort)==["opened","ready_for_review","reopened","synchronize"])' \
+    || deviate CI-TRIGGER 'ci.yml: trigger must be exactly pull_request with types [opened, synchronize, reopened, ready_for_review] and no paths or branches filters'
+  j '(.concurrency.group|type=="string") and (.concurrency.group|contains("github.event.pull_request.number")) and .concurrency["cancel-in-progress"]==true' \
+    || deviate CI-CONCURRENCY 'ci.yml: concurrency must group by github.event.pull_request.number with cancel-in-progress: true'
+  j '.permissions == {"contents":"read"}' \
+    || deviate CI-PERMISSIONS 'ci.yml: workflow permissions must be exactly contents: read'
+  j '(.jobs|type=="object") and (.jobs|has("ci-required"))' \
+    || deviate CI-JOBS 'ci.yml: job ci-required is required'
+
+  job_names="$(printf '%s' "$wf" | jq -r '(.jobs? // {} | if type=="object" then . else {} end) | keys_unsorted[]' 2>/dev/null || true)"
+  while IFS= read -r job; do
+    test -n "$job" || continue
+    case "$job" in
+      ci-required) target='task ci' ;;
+      ci-*) target="task $job" ;;
+      *) deviate CI-JOB-NAME "ci.yml: job $job is not part of the standard; delete it, or fold its check into task check (ci-required) or into a new task ci-<lane> with its own ci-<lane> job if it must block merging; non-blocking work moves to a non-required workflow"; continue ;;
+    esac
+    required_jobs="${required_jobs:+$required_jobs, }\`$job\`"
+    jobjson="$(printf '%s' "$wf" | jq -c --arg job "$job" '.jobs[$job] | if type=="object" then . else {} end' 2>/dev/null)" || jobjson=''
+    test -n "$jobjson" || jobjson='{}'
+    stepsjson="$(printf '%s' "$jobjson" | jq -c '(.steps? // []) | if type=="array" then . else [] end' 2>/dev/null)" || stepsjson=''
+    test -n "$stepsjson" || stepsjson='[]'
+    jj() { printf '%s' "$jobjson" | jq -e "$1" >/dev/null 2>&1; }
+    js() { printf '%s' "$stepsjson" | jq -e "$1" >/dev/null 2>&1; }
+    jj '(.if|type=="string") and (.if|contains("!github.event.pull_request.draft")) and (.if|contains("github.event.pull_request.head.repo.full_name == github.repository"))' \
+      || deviate CI-GUARD "ci.yml: job $job must guard with !github.event.pull_request.draft && head.repo.full_name == github.repository"
+    jj '.["timeout-minutes"]|type=="number"' \
+      || deviate CI-TIMEOUT "ci.yml: job $job must set timeout-minutes"
+    jj 'has("needs")|not' \
+      || deviate CI-NEEDS "ci.yml: job $job must not declare needs; required jobs are independent"
+    jj '(has("strategy")|not) or ((.strategy|type=="object") and (.strategy.matrix == null))' \
+      || deviate CI-MATRIX "ci.yml: job $job must not use a matrix; route by job, not by matrix"
+    printf '%s' "$stepsjson" | jq -e --arg t "$target" '[.[] | select(type=="object" and has("run")) | .run] == [$t]' >/dev/null 2>&1 \
+      || deviate CI-TARGET "ci.yml: job $job must run exactly one step: $target"
+    jj '(.steps? // []) | (type=="array") and all(type=="object")' \
+      || deviate CI-PIN "ci.yml: job $job has a step that is not a mapping; every step must be a run step or a SHA-pinned uses step"
+    while IFS= read -r uses; do
+      test -n "$uses" || continue
+      # Local composite actions and docker:// images carry no ref to pin.
+      case "$uses" in ./*|docker://*) continue ;; esac
+      printf '%s' "$uses" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(/[A-Za-z0-9_./-]+)?@[0-9a-f]{40}$' \
+        || deviate CI-PIN "ci.yml: job $job uses unpinned action $uses"
+    done <<< "$(printf '%s' "$stepsjson" | jq -r '.[] | select(type=="object" and has("uses")) | .uses' 2>/dev/null || true)"
+    js '[.[] | select(type=="object" and ((.uses? // "") | type=="string") and ((.uses? // "") | startswith("actions/checkout@"))) | ((.with? // {}) | if type=="object" then .["fetch-depth"] else null end)] | length > 0 and all(. == 0)' \
+      || deviate CI-FETCH-DEPTH "ci.yml: job $job must check out with fetch-depth: 0"
+  done <<< "$job_names"
+
+  printf -- '- Required jobs: %s\n' "${required_jobs:-none}"
+  printf -- '- Runners:\n'
+  printf '%s' "$wf" | jq -r '(.jobs? // {} | if type=="object" then . else {} end) | to_entries[] | "  - `\(.key)` = `\((.value | if type=="object" then .["runs-on"] else null end) | tostring)`"' 2>/dev/null || true
+  printf '\n'
 fi
 
-printf '\nThis report is read-only and mechanical. Confirm required checks, changed-file semantics, recent runs, billing, private dependencies, generated docs, platform constraints, and the agent-side review-to-dispatch-and-merge handoff separately.\n'
+# --- other workflows
+# Same tolerance as the required workflow: an unparseable or oddly-shaped
+# document is reported and skipped rather than aborting the run.
+printf '## Other workflows\n\n'
+other_count=0
+if test -d "$workflow_dir"; then
+  while IFS= read -r wf_path; do
+    test -n "$wf_path" || continue
+    test "$wf_path" != "$ci_yml" || continue
+    other_count=$((other_count + 1))
+    rel="${wf_path#"$repo_root"/}"
+    base_name="$(basename "$wf_path")"
+    if ! owf="$(yq -o=json -I=0 '.' "$wf_path" 2>/dev/null)" || test -z "$owf"; then
+      printf -- '- `%s`: not parseable as YAML\n' "$base_name"
+      deviate WF-PARSE "$rel: not parseable as YAML; timeout and pin checks skipped"
+      continue
+    fi
+    ojobs="$(printf '%s' "$owf" | jq -c '(.jobs? // {}) | if type=="object" then . else {} end' 2>/dev/null)" || ojobs=''
+    test -n "$ojobs" || ojobs='{}'
+    triggers="$(printf '%s' "$owf" | jq -r '.on | if type=="string" then . elif type=="array" then join(", ") elif type=="object" then (keys|join(", ")) else "none" end' 2>/dev/null)" || triggers=''
+    printf -- '- `%s`: triggers `%s`\n' "$base_name" "${triggers:-none}"
+    if printf '%s' "$owf" | jq -e '.on | if type=="string" then (.=="pull_request" or .=="pull_request_target") elif type=="array" then (index("pull_request")!=null or index("pull_request_target")!=null) elif type=="object" then (has("pull_request") or has("pull_request_target")) else false end' >/dev/null 2>&1; then
+      deviate WF-PR-TRIGGER "$rel: only ci.yml may use pull_request or pull_request_target; move this workflow to schedule, push tags, or workflow_dispatch"
+    fi
+    missing_timeouts="$(printf '%s' "$ojobs" | jq -r '[to_entries[] | select((.value | if type=="object" then .["timeout-minutes"] else null end) == null) | .key] | join(", ")' 2>/dev/null)" || missing_timeouts=''
+    if test -n "$missing_timeouts"; then
+      deviate WF-TIMEOUT "$rel: jobs missing timeout-minutes: $missing_timeouts"
+    fi
+    while IFS= read -r uses; do
+      test -n "$uses" || continue
+      # Local composite actions and docker:// images carry no ref to pin.
+      case "$uses" in ./*|docker://*) continue ;; esac
+      printf '%s' "$uses" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(/[A-Za-z0-9_./-]+)?@[0-9a-f]{40}$' \
+        || deviate WF-PIN "$rel: unpinned action $uses"
+    done <<< "$(printf '%s' "$ojobs" | jq -r '.[] | (if type=="object" then (.steps? // []) else [] end) | (if type=="array" then . else [] end) | .[] | select(type=="object" and has("uses")) | .uses' 2>/dev/null || true)"
+  done <<< "$(find "$workflow_dir" -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) -print | sort)"
+fi
+if test "$other_count" -eq 0; then
+  printf -- '- None\n'
+fi
+printf '\n'
+
+# --- Taskfile and classifier
+printf '## Taskfile\n\n'
+taskfile="$(find "$repo_root" -maxdepth 1 -type f \( -iname 'taskfile.yml' -o -iname 'taskfile.yaml' \) -print -quit)"
+if test -z "$taskfile"; then
+  printf -- '- Missing\n'
+  deviate TASK-CI-MISSING 'Taskfile.yml: not found; the required workflow runs task ci -- add a Taskfile and copy task ci from the skill asset assets/Taskfile.ci.yml'
+  deviate TASK-CHECK-MISSING 'Taskfile.yml: not found; task check is required'
+  deviate TASK-DOCS-CHECK-MISSING 'Taskfile.yml: not found; task docs-check is required'
+else
+  tasks_json="$(yq -o=json -I=0 '.tasks // {}' "$taskfile" 2>/dev/null)" || tasks_json=''
+  case "$tasks_json" in '{'*) ;; *) tasks_json='{}' ;; esac
+  has_task() { printf '%s' "$tasks_json" | jq -e --arg t "$1" 'has($t)' >/dev/null 2>&1; }
+  for t in ci check docs-check; do
+    if has_task "$t"; then printf -- '- `%s`: present\n' "$t"; else printf -- '- `%s`: missing\n' "$t"; fi
+  done
+  has_task ci || deviate TASK-CI-MISSING "$(basename "$taskfile"): task ci is required; copy it from the skill asset assets/Taskfile.ci.yml"
+  has_task check || deviate TASK-CHECK-MISSING "$(basename "$taskfile"): task check is required"
+  has_task docs-check || deviate TASK-DOCS-CHECK-MISSING "$(basename "$taskfile"): task docs-check is required"
+  while IFS= read -r job; do
+    test -n "$job" || continue
+    case "$job" in
+      ci-required) ;;
+      ci-*) has_task "$job" || deviate TASK-LANE-MISSING "$(basename "$taskfile"): task $job is required by job $job" ;;
+    esac
+  done <<< "${job_names:-}"
+fi
+if test -x "$repo_root/scripts/ci-classify.sh"; then
+  printf -- '- `scripts/ci-classify.sh`: present\n'
+else
+  printf -- '- `scripts/ci-classify.sh`: missing\n'
+  deviate CLASSIFY-MISSING 'scripts/ci-classify.sh: missing or not executable; copy the skill asset assets/ci-classify.sh to scripts/ci-classify.sh and chmod +x it'
+fi
+printf '\n'
+
+# --- default-branch rules
+# Fails closed: a configured rules source that cannot be read, is empty, or is
+# not a JSON array is a tool error (exit 2), never a silent pass. The same goes
+# for any gh call in live mode -- an unauthenticated or rate-limited run must
+# not be reported as "no rules found".
+printf '## Default-branch rules\n\n'
+rules_json=""
+rules_configured=0
+rules_source='not checked (set CI_AUDIT_RULESET=live or CI_AUDIT_RULESET_JSON=<file>)'
+legacy_protection='not checked'
+legacy_reason=""
+gh_failed() { # what, detail
+  printf 'error: cannot read %s via gh: %s\n' "$1" "$(printf '%s' "$2" | tr '\n' ' ')" >&2
+  exit 2
+}
+if test -n "${CI_AUDIT_RULESET_JSON:-}"; then
+  rules_configured=1
+  rules_origin="$CI_AUDIT_RULESET_JSON"
+  rules_source="\`$CI_AUDIT_RULESET_JSON\`"
+  rules_json="$(cat "$CI_AUDIT_RULESET_JSON" 2>/dev/null)" || {
+    printf 'error: cannot read CI_AUDIT_RULESET_JSON: %s\n' "$CI_AUDIT_RULESET_JSON" >&2
+    exit 2
+  }
+elif test "${CI_AUDIT_RULESET:-}" = live; then
+  rules_configured=1
+  require_command gh
+  origin_url="$(git -C "$repo_root" remote get-url origin 2>/dev/null || true)"
+  slug="$(printf '%s' "$origin_url" | sed -E 's#^(https://github.com/|git@github.com:)##; s#\.git$##')"
+  if test -z "$slug"; then
+    printf 'error: cannot read default-branch rules: no origin remote to derive a GitHub slug from\n' >&2
+    exit 2
+  fi
+  rules_origin="live $slug"
+  default_branch="$(gh api "repos/$slug" --jq .default_branch 2>&1)" \
+    || gh_failed "the default branch of $slug" "$default_branch"
+  test -n "$default_branch" || gh_failed "the default branch of $slug" 'empty response'
+  rules_json="$(gh api "repos/$slug/rules/branches/$default_branch" 2>&1)" \
+    || gh_failed "default-branch rules for $slug" "$rules_json"
+  rules_source="live \`$slug\` \`$default_branch\`"
+  rules_origin="live $slug $default_branch"
+  # A 404 means "not protected"; anything else (403, 401, network) is unknown,
+  # and unknown must not read as absent.
+  if protection_err="$(gh api --silent "repos/$slug/branches/$default_branch/protection" 2>&1)"; then
+    legacy_protection=present
+  elif printf '%s' "$protection_err" | grep -q 'HTTP 404'; then
+    legacy_protection=absent
+  else
+    legacy_protection=unknown
+    legacy_reason="$(printf '%s' "$protection_err" | tr '\n' ' ')"
+  fi
+fi
+printf -- '- Source: %s\n' "$rules_source"
+printf -- '- Legacy branch protection: %s\n' "$legacy_protection"
+if test "$rules_configured" -eq 1; then
+  printf '%s' "$rules_json" | jq -e 'type=="array"' >/dev/null 2>&1 \
+    || { printf 'error: default-branch rules source is empty or not a JSON array: %s\n' "$rules_origin" >&2; exit 2; }
+  r() { printf '%s' "$rules_json" | jq -e "$1" >/dev/null 2>&1; }
+  r 'any(.[]; .type=="pull_request")' || deviate RULES-PR 'default branch: a pull_request rule is required (no direct pushes)'
+  r 'any(.[]; .type=="pull_request" and (.parameters.allowed_merge_methods // []) == ["squash"])' || deviate RULES-SQUASH 'default branch: allowed merge methods must be exactly [squash]'
+  r 'any(.[]; .type=="deletion")' || deviate RULES-DELETION 'default branch: deletion must be blocked'
+  r 'any(.[]; .type=="non_fast_forward")' || deviate RULES-FF 'default branch: force pushes must be blocked'
+  r 'any(.[]; .type=="required_status_checks" and .parameters.strict_required_status_checks_policy==true)' || deviate RULES-STRICT 'default branch: required status checks must be strict (branch up to date)'
+  actual_contexts="$(printf '%s' "$rules_json" | jq -c '[.[] | select(.type=="required_status_checks") | .parameters.required_status_checks[]? | .context] | sort' 2>/dev/null)" || actual_contexts=''
+  test -n "$actual_contexts" || actual_contexts='[]'
+  if test -z "${job_names:-}"; then
+    # CI-MISSING already covers this; comparing against no jobs would only add noise.
+    printf -- '- Required contexts (from rulesets only): expected unknown (ci.yml missing or unparseable), actual `%s`\n' "$actual_contexts"
+  else
+    expected_contexts="$(printf '%s\n' "$job_names" | { grep -E '^ci-' || true; } | LC_ALL=C sort | jq -R . | jq -sc .)"
+    printf -- '- Required contexts (from rulesets only): expected `%s`, actual `%s`\n' "$expected_contexts" "$actual_contexts"
+    test "$expected_contexts" = "$actual_contexts" || deviate RULES-CHECKS "default branch: required status checks must be exactly the ci-* jobs $expected_contexts (actual $actual_contexts)"
+  fi
+  case "$legacy_protection" in
+    present) deviate RULES-LEGACY 'default branch: legacy branch protection is present; the rule checks above read rulesets only, so any protection it enforces (required checks, strict, reviews) is not reflected above. Delete the legacy protection, then apply the ruleset' ;;
+    unknown) deviate RULES-LEGACY "default branch: legacy branch protection state unknown (gh returned $legacy_reason); verify and remove it manually" ;;
+  esac
+fi
+printf '\n'
+
+# --- deviations
+printf '## Deviations\n\n'
+if test -z "$deviations"; then
+  printf -- '- None. Repository conforms to the standard.\n'
+  exit 0
+fi
+printf '%s\n' "$deviations"
+exit 3

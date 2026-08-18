@@ -4,7 +4,7 @@ This shared baseline owns finding disposition, finding-family classification, pr
 
 ## Structure
 
-- Do the work in a branch, divided into multiple PRs if needed, using TDD where appropriate.
+- Do the work in a branch, divided into multiple PRs if needed, using TDD where appropriate. Open every PR as a draft (`gh pr create --draft`); the required CI workflow skips drafts, so no `ci-*` job runs during the draft phase (the workflow starts and every job is skipped).
 - Give each PR a declared representation domain, guarantee level, artifact classification, terminating evidence plan, and review-round budget before review begins.
 
 ## For each PR
@@ -13,8 +13,8 @@ This shared baseline owns finding disposition, finding-family classification, pr
 2. Independently disposition every substantive finding, fix and verify only accepted `fix-now` findings, and permit at most one fresh replacement review after those fixes.
 3. Finish when the terminating evidence plan and review budget are satisfied with no unresolved `stop-for-decision` finding. Do not make reviewer exhaustion a completion criterion.
 4. Push the final candidate, run slice-specific stress checks, and run the repository's local exact-head certification.
-5. Request required hosted CI for that same head through the portfolio's PR-associated `ci:certify` trigger, then verify the resulting `pull_request`/`labeled` run binds the certified PR head and produces the protected `ci-required` result in the live PR status rollup. Do not substitute a successful `workflow_dispatch` run for this merge gate.
-6. Merge that exact head.
+5. Mark the PR ready (`gh pr ready`) so the required `ci-*` jobs run on that same head, then wait until the latest `ci` run started after marking the PR ready (or by a later push) on the exact live head has completed with conclusion `success` and every `ci-*` job in it reports `success` rather than `skipped` (`gh run list --workflow ci.yml --commit <head> --json databaseId,createdAt,status,conclusion`, then `gh run view <id> --json jobs`); see [hosted CI](#exact-head-local-certification-and-hosted-ci).
+6. Merge that exact head with `gh pr merge --squash --match-head-commit <head>`.
 7. **Only after that merge is on the default branch**, run `append-dev-journal` without RAS. **NEVER start `append-dev-journal` before the main work has merged.**
 8. Revalidate every pending `defer` against the merged head, then update OmniFocus: complete the relevant task and file the surviving follow-ups. See [deferred-finding revalidation](#deferred-finding-revalidation).
 
@@ -136,8 +136,6 @@ This applies to every deferred finding, including ones a verification run still 
 
 After the bounded review and terminating evidence plan are complete, run every slice-specific stress command, push the final candidate, and verify the worktree is clean. If the repository exposes `task preflight`, run it and retain its exact head/base receipt; otherwise run and record the repository's documented local equivalents against the exact pushed SHA. Any candidate change invalidates that receipt and returns the PR to review before recertification, except for the docs-only polish policy above.
 
-Request hosted CI only when local certification passes, its head is still the live PR head, and its base is still the live default-branch tip. Under the portfolio convention, add the `ci:certify` label to the live PR and require the resulting workflow to be a `pull_request` run with `action=labeled`. Verify that the event and current PR still bind the certified head and base, that the workflow consumes or removes the one-shot label, and that the successful `ci-required` result appears in the PR's protected status rollup before merging the exact certified head.
-
-Do not use a successful `workflow_dispatch` run as merge-gating evidence, even when its inputs and checkout bind the exact head: GitHub may not credit that run to the PR ruleset. A repository-specific overlay may define another PR-associated certification trigger, but it must explicitly replace this convention and preserve the same exact-head, protected-rollup, and one-shot guarantees. Hosted CI remains authoritative for clean-runner, operating-system, architecture, secret, and service boundaries that local execution cannot reproduce.
+Mark the PR ready only when local certification passes and its head is still the live PR head. Under the portfolio CI standard the required workflow runs on `pull_request` and skips drafts, so `gh pr ready` is the request for hosted CI: it starts the required `ci-*` jobs on the exact live head. Wait until the latest `ci` run started after marking the PR ready (or by a later push) on the exact live head has completed with conclusion `success` and every `ci-*` job in it reports `success` rather than `skipped` (`gh run list --workflow ci.yml --commit <head> --json databaseId,createdAt,status,conclusion`, then `gh run view <id> --json jobs`). Confirm the head has not moved (`gh pr view --json headRefOid`), and merge with `gh pr merge --squash --match-head-commit <head>`. A push after ready re-runs CI on the new head; that is expected, and the new head needs its own green checks and, if code changed, its own review round. If the default branch advances, GitHub blocks the merge until the branch is updated, which re-runs CI. Hosted CI remains authoritative for clean-runner, operating-system, architecture, secret, and service boundaries that local execution cannot reproduce.
 
 Diagnose failed CI before deciding what happens next. Product tests, static analysis, races, nondeterministic repository tests, and reproducible tool failures return the PR to implementation, review, and recertification. A same-head rerun is allowed only for a demonstrated external infrastructure failure. If the default branch advances, update the branch and repeat every review, certification, and CI gate required by the repository.

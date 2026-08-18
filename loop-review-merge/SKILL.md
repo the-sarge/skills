@@ -11,8 +11,8 @@ Drive a PR to merge through a review loop where **you** do the fixing and judgin
 
 1. Read the repository's review protocol when present and compose its stronger repository-specific rules with the shared [review-loop baseline](../_shared/REVIEW-LOOP.md).
 2. Require the accepted contract to satisfy the shared [review briefing](../_shared/REVIEW-LOOP.md#review-briefing), then execute the [bounded review algorithm](../_shared/REVIEW-LOOP.md#bounded-review-algorithm).
-3. Run the composed exact-head local-certification and hosted-CI phase.
-4. Merge that exact head using the repository-required strategy. If GitHub reports `mergeable: UNKNOWN` right after a push, poll until `MERGEABLE` before merging.
+3. Run the composed exact-head local-certification phase, then mark the draft PR ready and wait for every required `ci-*` check on the live head (a post-ready `ci` run with conclusion `success`; a draft-phase `skipped` check is not evidence), per the shared [hosted-CI convention](../_shared/REVIEW-LOOP.md#exact-head-local-certification-and-hosted-ci).
+4. Merge that exact head with `gh pr merge --squash --match-head-commit <head>`. If GitHub reports `mergeable: UNKNOWN` right after a push, poll until `MERGEABLE` before merging.
 
 When the protocol produces `stop-for-decision`, preserve the branch, record all dispositions and the review and verification history plus the precise invariant-and-owner root, and report the required design decision to the user. A `defer` or `reject` finding does not enter this branch. This merge skill does not silently widen or redesign the PR.
 
