@@ -506,6 +506,18 @@ if rg -qi 'expected_sha|ci:certify|ci-certify|status bridge' "$migration"; then
   fail 'migration.md: must not describe dispatch/label certification'
 fi
 
+skill_md="$skill_root/SKILL.md"
+rg -Fq 'name: standardize-github-ci' "$skill_md" || fail 'SKILL.md: frontmatter name'
+rg -Fq 'scripts/audit-ci.sh' "$skill_md" || fail 'SKILL.md: must run the audit'
+rg -Fq 'references/ci-policy.md' "$skill_md" || fail 'SKILL.md: must load the policy'
+rg -Fq 'references/migration.md' "$skill_md" || fail 'SKILL.md: must load the migration checklist'
+if rg -qi 'dispatch-gated|expected_sha|ci:certify|status bridge|labeled' "$skill_md"; then
+  fail 'SKILL.md: must not describe dispatch/label certification'
+fi
+if rg -qi 'dispatch|exact-head' "$skill_root/agents/openai.yaml"; then
+  fail 'openai.yaml: stale description'
+fi
+
 # New test sections belong above this line, under their own `# ---` marker;
 # nothing may follow `completed=1` but the success line.
 completed=1
