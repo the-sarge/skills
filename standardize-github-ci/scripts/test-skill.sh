@@ -61,6 +61,63 @@ fi
 
 # --- classifier
 
+test -x "$classify" || fail "missing or non-executable $classify"
+
+cls_repo="$tmp/classify-repo"
+mkdir -p "$cls_repo/docs" "$cls_repo/pkg"
+git -C "$cls_repo" init -q -b main
+git -C "$cls_repo" config user.email ci-skill-test@example.invalid
+git -C "$cls_repo" config user.name ci-skill-test
+printf '# readme\n' > "$cls_repo/README.md"
+printf 'package pkg\n' > "$cls_repo/pkg/pkg.go"
+git -C "$cls_repo" add . && git -C "$cls_repo" commit -qm initial
+
+classify_in() { (cd "$cls_repo" && env "$@" "$classify" 2>/dev/null); }
+
+# empty diff on main -> fail closed
+test "$(classify_in CI_DEFAULT_BRANCH=main)" = 'docs_only=false' || fail 'classifier: empty diff must be docs_only=false'
+
+git -C "$cls_repo" checkout -qb docs-branch
+printf 'more\n' >> "$cls_repo/README.md"
+mkdir -p "$cls_repo/docs/deep" && printf 'note\n' > "$cls_repo/docs/deep/notes.txt"
+printf 'entry\n' > "$cls_repo/DEV-JOURNAL.md"
+git -C "$cls_repo" add . && git -C "$cls_repo" commit -qm docs
+test "$(classify_in CI_DEFAULT_BRANCH=main)" = 'docs_only=true' || fail 'classifier: markdown, docs/**, DEV-JOURNAL.md must be docs_only=true'
+
+# unknown extension outside docs/ -> not docs
+printf 'x\n' > "$cls_repo/notes.txt"
+git -C "$cls_repo" add . && git -C "$cls_repo" commit -qm txt
+test "$(classify_in CI_DEFAULT_BRANCH=main)" = 'docs_only=false' || fail 'classifier: unknown extension must be docs_only=false'
+# allowlist extension via CI_DOCS_GLOBS
+test "$(classify_in CI_DEFAULT_BRANCH=main CI_DOCS_GLOBS='*.md docs/* DEV-JOURNAL.md *.txt')" = 'docs_only=true' || fail 'classifier: CI_DOCS_GLOBS must extend the allowlist'
+
+# source change -> not docs
+printf 'var Changed = true\n' >> "$cls_repo/pkg/pkg.go"
+git -C "$cls_repo" add . && git -C "$cls_repo" commit -qm source
+test "$(classify_in CI_DEFAULT_BRANCH=main)" = 'docs_only=false' || fail 'classifier: source change must be docs_only=false'
+
+# explicit base wins
+docs_head="$(git -C "$cls_repo" rev-parse HEAD~2)"
+test "$(classify_in CI_DEFAULT_BRANCH=main CI_HEAD_SHA="$docs_head" CI_BASE_SHA=main)" = 'docs_only=true' || fail 'classifier: CI_BASE_SHA/CI_HEAD_SHA must be honoured'
+
+# missing base -> fail closed, still exit 0
+test "$(classify_in CI_DEFAULT_BRANCH=does-not-exist)" = 'docs_only=false' || fail 'classifier: unknown base must be docs_only=false'
+(cd "$cls_repo" && CI_DEFAULT_BRANCH=does-not-exist "$classify" >/dev/null 2>&1) || fail 'classifier: must exit 0 when failing closed'
+
+# GITHUB_OUTPUT mirror
+gh_out="$tmp/github-output"
+: > "$gh_out"
+(cd "$cls_repo" && GITHUB_OUTPUT="$gh_out" CI_DEFAULT_BRANCH=main "$classify" >/dev/null 2>&1)
+test "$(cat "$gh_out")" = 'docs_only=false' || fail 'classifier: GITHUB_OUTPUT mirror'
+
+# no globbing against the working tree: a file literally named '*.md' must not widen the match
+git -C "$cls_repo" checkout -q main
+git -C "$cls_repo" checkout -qb glob-branch
+printf 'x\n' > "$cls_repo/pkg/other.go"
+touch "$cls_repo/*.md"
+git -C "$cls_repo" add . && git -C "$cls_repo" commit -qm glob
+test "$(classify_in CI_DEFAULT_BRANCH=main)" = 'docs_only=false' || fail 'classifier: must not pathname-expand globs'
+
 # --- audit
 
 # --- docs
