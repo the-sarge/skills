@@ -653,7 +653,8 @@ fi
 migration="$skill_root/references/migration.md"
 rg -Fq 'gh pr ready' "$migration" || fail 'migration.md: must describe marking the PR ready'
 rg -Fq 'every caller' "$migration" || fail 'migration.md: must require an inventory of every caller of a renamed or redefined Taskfile target'
-rg -Fq 'purpose-named' "$migration" || fail 'migration.md: plan/apply must carry callers to purpose-named targets'
+rg -Fq 'for every caller found in §1.5, the purpose-named target it will call' "$migration" || fail 'migration.md §2: plan must map each caller to its purpose-named target'
+rg -Fq 'Define the purpose-named targets planned in §2' "$migration" || fail 'migration.md §3: apply must define the targets and repoint callers'
 rg -Fq 'never `task ci` or `task ci-<lane>`' "$policy" || fail 'ci-policy.md: non-required workflows must call purpose-named targets, never task ci or ci-<lane>'
 rg -Fq 'never `task ci` or `task ci-<lane>`' "$skill_root/SKILL.md" || fail 'SKILL.md: audit summary must cover both task ci and task ci-<lane>'
 rg -Fq 'gh pr merge --squash --match-head-commit' "$migration" || fail 'migration.md: must describe the exact-head squash merge'
