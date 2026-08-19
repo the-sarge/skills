@@ -57,9 +57,9 @@ Copy [`assets/Taskfile.ci.yml`](../assets/Taskfile.ci.yml) into the repository `
 - `ci`: runs `scripts/ci-classify.sh`; on `docs_only=true` runs `docs-check`, otherwise runs `check`. Empty diffs, an unknown base, and unknown file types classify as not docs-only.
 - `docs-check`: repository-owned documentation checks.
 - `check`: repository-owned ordinary merge gate (format, vet, lint, unit tests, build smoke).
-- `ci-<lane>`: runs the classifier, exits successfully with a message on docs-only changes, otherwise runs the lane.
+- `ci-<lane>`: runs the classifier, exits successfully with a message on docs-only changes, otherwise runs the lane. A lane that only matters for some paths is **path-gated** the same way: `CI_MATCH_GLOBS='<globs>' scripts/ci-classify.sh` prints `matches=true|false` (fails closed to `true`), and the target runs its body only on a match — see `ci-platform` in the asset. The job still starts and reports a real `success`, so the required check is honest; GitHub never sees the shortcut. This is how a repository keeps fine-grained per-path lane selection under the standard: in the Taskfile, never in workflow `paths:` filters or job conditions.
 - `release-gate` (when the repository publishes releases): the validation a tag-push release workflow runs before publishing; repository-owned, typically `check` plus the deep checks the PR gate deliberately skips.
-- `CI_DOCS_GLOBS` (Taskfile var): space-separated shell globs treated as documentation. Default `*.md docs/* DEV-JOURNAL.md LICENSE LICENSE.*`. Extend it per repository rather than editing the script.
+- `CI_DOCS_GLOBS` (Taskfile var): space-separated shell globs treated as documentation. Default `*.md docs/* DEV-JOURNAL.md LICENSE LICENSE.*`. Extend it per repository rather than editing the script. Path-gated lanes declare their own glob variable (for example `CI_PLATFORM_GLOBS`) and pass it as `CI_MATCH_GLOBS`.
 
 `task ci` behaves identically on a laptop and in CI, so a wrong classification is reproducible locally without pushing.
 

@@ -7,6 +7,8 @@ version: '3'
 vars:
   # Space-separated shell globs treated as documentation by scripts/ci-classify.sh.
   CI_DOCS_GLOBS: '*.md docs/* DEV-JOURNAL.md LICENSE LICENSE.*'
+  # Example path list for a path-gated lane (see ci-platform); one variable per gated lane.
+  CI_PLATFORM_GLOBS: 'platform/* *_windows.go *_darwin.go'
 
 tasks:
   ci:
@@ -29,6 +31,16 @@ tasks:
           *) task race ;;
         esac
 
+  ci-platform:
+    desc: Example path-gated required lane; runs its body only when its paths changed, otherwise reports success quickly
+    cmds:
+      - |
+        result="$(CI_MATCH_GLOBS='{{.CI_PLATFORM_GLOBS}}' scripts/ci-classify.sh)"
+        case "$result" in
+          matches=false) echo "no platform-relevant changes; lane not applicable" ;;
+          *) task platform ;;
+        esac
+
   docs-check:
     desc: Documentation checks (repository-owned)
     cmds:
@@ -44,6 +56,11 @@ tasks:
     cmds:
       - task: check
       - echo "replace with the repository's deep checks (race, vulnerability scan, SAST); keep bounded fuzzing on the nightly if it is slow or flaky"
+
+  platform:
+    desc: Platform lane body (repository-owned; only if ci-platform is used)
+    cmds:
+      - echo "replace with the repository's platform-specific checks"
 
   race:
     desc: Race lane body (repository-owned; only if ci-race is used)
