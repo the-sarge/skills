@@ -12,7 +12,7 @@ Migrate one repository at a time to the [portfolio CI standard](ci-policy.md). E
 
 ## 2. Plan (no edits)
 
-Produce, per repository: the mapping from old jobs to `ci-required` / `ci-<lane>` / non-required workflows; the `runs-on` per job; the `task check` and `task docs-check` bodies (existing lanes renamed, not rewritten); any `CI_DOCS_GLOBS` extension; the ruleset diff including any `ci-<lane>` contexts to add; and the bootstrap note below.
+Produce, per repository: the mapping from old jobs to `ci-required` / `ci-<lane>` / non-required workflows; the `runs-on` per job; the `task check` and `task docs-check` bodies (existing lanes renamed, not rewritten); any `CI_DOCS_GLOBS` extension; the ruleset diff including any `ci-<lane>` contexts to add; and the bootstrap note below; and, for every caller found in §1.5, the purpose-named target it will call (for example `release-gate` = `check` + `deep-check` + `sast`) and the body of that target.
 
 ## 3. Apply (on a feature branch, after approval)
 
@@ -20,8 +20,9 @@ Produce, per repository: the mapping from old jobs to `ci-required` / `ci-<lane>
 2. Copy `assets/ci-classify.sh` to `scripts/ci-classify.sh` unchanged and make it executable.
 3. Merge `assets/Taskfile.ci.yml` into `Taskfile.yml`: add `ci`, `docs-check`, `check`, and one `ci-<lane>` per extra job; point `check` and `docs-check` at the repository's existing commands.
 4. Remove `pull_request` and `pull_request_target` from every other workflow; delete workflows that only existed to certify PRs (dispatch/label/status-bridge workflows). Keep deep, security, fuzz, cross-platform, and release workflows on their non-PR triggers, pinned and with timeouts.
-5. Run `task ci` locally on the branch (expect the docs-only or full path as appropriate); run `scripts/audit-ci.sh .` and expect `- None. Repository conforms to the standard.`; then run `CI_AUDIT_RULESET=live scripts/audit-ci.sh .` and expect only `RULES-*` deviations before the ruleset is applied and none after.
-6. Commit. Do not open the PR yet.
+5. Define the purpose-named targets planned in §2 in `Taskfile.yml` and repoint every caller from §1.5 (`task ci` / `task ci-<lane>` in release or scheduled workflows, scripts, docs) to them; rename steps whose names no longer describe what runs.
+6. Run `task ci` locally on the branch (expect the docs-only or full path as appropriate); run `scripts/audit-ci.sh .` and expect `- None. Repository conforms to the standard.`; then run `CI_AUDIT_RULESET=live scripts/audit-ci.sh .` and expect only `RULES-*` deviations before the ruleset is applied and none after.
+7. Commit. Do not open the PR yet.
 
 ## 4. Bootstrap warning
 

@@ -387,14 +387,18 @@ jobs:
       - run: |
           echo build
           task ci-race
+      - run: task ci>/dev/null
+      - run: 'test -n "`task ci-portable-linux`"'
+      - run: task cicd && task ci_fast && task ci-
 YAML
 git -C "$rel" add . && git -C "$rel" commit -qm release
 run_audit "$rel"; out="$audit_out"
 test "$audit_rc" -eq 3 || fail "audit: non-required workflow running task ci must exit 3:
 $out"
 expect_deviation "$out" WF-TASK-CI
-printf '%s\n' "$out" | rg -Fq 'release.yml: runs `task ci`, `task ci-race`' || fail 'audit: WF-TASK-CI must name the ci targets it found'
-yq -i '.jobs.publish.steps[1].run = "task release-gate" | .jobs.publish.steps[2].run = "task build"' "$rel/.github/workflows/release.yml"
+printf '%s\n' "$out" | rg -Fq 'release.yml: runs `task ci`, `task ci-portable-linux`, `task ci-race`' || fail "audit: WF-TASK-CI must name exactly the ci targets it found (not cicd/ci_fast/ci-):
+$out"
+yq -i '.jobs.publish.steps[1].run = "task release-gate" | .jobs.publish.steps[2].run = "task build" | .jobs.publish.steps[3].run = "task release-gate>/dev/null" | .jobs.publish.steps[4].run = "task nightly"' "$rel/.github/workflows/release.yml"
 git -C "$rel" commit -qam release-gate
 run_audit "$rel"; out="$audit_out"
 test "$audit_rc" -eq 0 || fail "audit: non-required workflow calling a purpose-named target must be conformant:
@@ -649,6 +653,9 @@ fi
 migration="$skill_root/references/migration.md"
 rg -Fq 'gh pr ready' "$migration" || fail 'migration.md: must describe marking the PR ready'
 rg -Fq 'every caller' "$migration" || fail 'migration.md: must require an inventory of every caller of a renamed or redefined Taskfile target'
+rg -Fq 'purpose-named' "$migration" || fail 'migration.md: plan/apply must carry callers to purpose-named targets'
+rg -Fq 'never `task ci` or `task ci-<lane>`' "$policy" || fail 'ci-policy.md: non-required workflows must call purpose-named targets, never task ci or ci-<lane>'
+rg -Fq 'never `task ci` or `task ci-<lane>`' "$skill_root/SKILL.md" || fail 'SKILL.md: audit summary must cover both task ci and task ci-<lane>'
 rg -Fq 'gh pr merge --squash --match-head-commit' "$migration" || fail 'migration.md: must describe the exact-head squash merge'
 rg -Fq 'assets/ruleset.json' "$migration" || fail 'migration.md: must apply the ruleset asset'
 rg -Fq 'gh pr create --draft' "$migration" || fail 'migration.md: must open the migration PR as a draft'
