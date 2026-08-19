@@ -171,3 +171,28 @@ The release gate now has a fixed name: every tag-push release workflow runs `tas
 ### Next
 
 - Sync the skill into dotfiles; migrate codemux → tapmux → wiremux → gridcast → wellspring, defining `release-gate` wherever a tag-push workflow exists. Live view: [issue #8](https://github.com/the-sarge/skills/issues/8).
+
+---
+
+## WF-TIMEOUT exempts reusable-workflow callers - 2026-08-19 13:15 EDT
+
+**Main:** `40adb8ce41fa`
+**Actor:** Claude
+
+### Summary
+
+Audit false positive fixed: `WF-TIMEOUT` no longer flags a job that only calls a reusable workflow (`jobs.<id>.uses`), which cannot carry `timeout-minutes`. Surfaced by the wellspring audit (`portable_storage` caller). Landed on `main` as squash commit `40adb8c` from [PR #17](https://github.com/the-sarge/skills/pull/17).
+
+### Completed
+
+- `scripts/audit-ci.sh`: the exemption applies only to a non-empty string job-level `uses`; scalar job values and `uses: null` / `""` / non-string remain flagged (fail closed).
+- `references/ci-policy.md`: the timeout sentence for non-required workflows is qualified accordingly.
+- `scripts/test-skill.sh`: reusable-caller job in the conformant scheduled fixture; a malformed-`uses` workflow asserting `WF-TIMEOUT` names `scalar_job, null_uses, empty_uses, numeric_uses` and spares the valid caller; policy grep.
+
+### Validation
+
+- RAS review run `20260819T170101` (6 findings: 3 fix-now, 3 duplicates); verification at `73ed153` cleared with no new concerns. `test-skill.sh` passed under default bash and `/bin/bash` 3.2; shellcheck clean.
+
+### Next
+
+- Sync to dotfiles; wellspring re-audit, then a plan that applies the two-part choice rule (own runner or timeout) and path-gated `ci-<lane>` targets instead of 20+ required jobs. Live view: [issue #8](https://github.com/the-sarge/skills/issues/8).
