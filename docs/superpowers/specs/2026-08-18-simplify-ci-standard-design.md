@@ -69,15 +69,15 @@ Rules:
 
 ### Required jobs
 
-The workflow contains one or more independent required jobs. Each:
+The workflow contains one or more required jobs, each a required check in its own right. Each:
 
 - is named `ci-required` (the default job) or `ci-<lane>` (an additional merge-blocking lane, e.g. `ci-race`);
 - carries the same `if` guard, timeout, and pinned setup steps;
 - has its own `runs-on`, which is how per-lane runner routing works;
 - runs exactly one Taskfile target (`task ci` for `ci-required`, `task ci-<lane>` for others);
-- declares no `needs:` and is not aggregated by any other job.
+- is not aggregated by any other job and declares no `needs:`, except for a cross-runner artifact exchange (amended 2026-08-19): a destination `ci-<lane>` job may `needs:` origin `ci-*` jobs in the same workflow when it must consume an artifact produced on a different runner in the same run; every job in that graph is itself a required check, the downstream job's guard calls no status function (`always()`/`failure()`/`cancelled()`/`success()`), and no job uses the `needs` context for anything but `needs.<job>.outputs.<name>` (any other use — `.result`, `.conclusion`, `needs.*`, `toJSON(needs)` — is aggregation).
 
-The choice rule: a lane that is merge-blocking today becomes a standalone `ci-<lane>` job; a lane that is not merge-blocking moves to a non-required workflow. Because no job depends on another, each required check either ran and passed or is absent; absence blocks the merge. This is fail-closed without any aggregation script.
+The choice rule: a lane that is merge-blocking today becomes a standalone `ci-<lane>` job; a lane that is not merge-blocking moves to a non-required workflow. Every job in the graph is individually required, so the merge is blocked unless each `ci-*` check reports a real success: a missing check blocks, a failed origin blocks through its own red check, and a downstream job skipped after an origin failure is harmless because the origin already blocks. This is fail-closed without any aggregation script.
 
 ### Taskfile contract
 
@@ -131,7 +131,7 @@ GitHub carries no review-tool state. There are no labels, inputs, statuses, comm
 - `references/ci-policy.md`: replaced by the standard above. Removed: agent-gated dispatch, status bridge, one-shot labels, event-policy table, workflow-level change classification, duplicate-work policy, threat-model paragraphs.
 - `references/migration.md`: replaced by a per-repository checklist: inventory workflows and lanes → map each lane to `ci` / `ci-<lane>` / non-required workflow → write `ci.yml` from the asset → add `scripts/ci-classify.sh` and Taskfile targets → apply the ruleset with authorization and remove legacy protection → open the migration PR as a draft → verify on that PR (docs-only head, source head, main-advance block, draft un-mergeability) → mark ready → merge. Retains the bootstrap note that the old default-branch workflow may run once and that opening, cancelling, or rerunning that run needs the operator's OK.
 - `assets/`: add `ci.yml`, `ci-classify.sh`, `Taskfile.ci.yml` (snippet showing `ci`, `docs-check`, `check`, `ci-<lane>`), `ruleset.json`. Delete `ci.yml.template`, `classify-ci-changes.sh`, `require-ci-results.sh`.
-- `scripts/audit-ci.sh`: rewritten to report conformance to the standard: `ci.yml` trigger set, draft and same-repo guards, concurrency, permissions, timeouts, pinned actions, one Taskfile target per job, no `needs:`; non-required workflows free of `pull_request`/`pull_request_target`; Taskfile exposes `ci`; ruleset shape when `gh` access is available. Output is a short conformance table plus named deviations. All RAS/label/dispatch heuristics are deleted.
+- `scripts/audit-ci.sh`: rewritten to report conformance to the standard: `ci.yml` trigger set, draft and same-repo guards, concurrency, permissions, timeouts, pinned actions, one Taskfile target per job, `needs:` only on destination `ci-<lane>` jobs of a cross-runner exchange, no dependency-result reads; non-required workflows free of `pull_request`/`pull_request_target`; Taskfile exposes `ci`; ruleset shape when `gh` access is available. Output is a short conformance table plus named deviations. All RAS/label/dispatch heuristics are deleted.
 - `scripts/test-skill.sh`: forward tests for the new audit and classifier (see Testing).
 - `agents/openai.yaml`: description updated to match.
 
@@ -145,7 +145,7 @@ No new standalone doc; the policy reference is the single source.
 
 ## Testing
 
-- `scripts/test-skill.sh` is the executable suite: `audit-ci.sh` and `ci-classify.sh` run against temporary git fixtures. The conformant fixture (built from `assets/ci.yml`) produces zero deviations; each deviation the audit can emit (extra trigger, missing draft guard, missing same-repo guard, `needs:` present, unpinned action, missing timeout, `pull_request` on a non-required workflow, missing `task ci`) has a fixture that produces it. `ci-classify.sh` is exercised against real `git diff` output: docs-only, mixed, empty diff, unknown extension (last two must classify as not docs-only). Tests are written before the script behavior.
+- `scripts/test-skill.sh` is the executable suite: `audit-ci.sh` and `ci-classify.sh` run against temporary git fixtures. The conformant fixture (built from `assets/ci.yml`) produces zero deviations; each deviation the audit can emit (extra trigger, missing draft guard, missing same-repo guard, `needs:` outside an exchange, dependency-result reads, unpinned action, missing timeout, `pull_request` on a non-required workflow, missing `task ci`) has a fixture that produces it. `ci-classify.sh` is exercised against real `git diff` output: docs-only, mixed, empty diff, unknown extension (last two must classify as not docs-only). Tests are written before the script behavior.
 - `actionlint` and an authoritative YAML parse on `assets/ci.yml`; a fixture asserts the shipped asset itself passes the audit so template and checker cannot drift.
 - Markdown: no hard-wrapping; every intra-repo link and anchor referenced from the touched skills resolves.
 - One read-only dry-run audit of a real un-migrated repository to confirm the deviations read sensibly. No repository is modified.

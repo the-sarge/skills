@@ -5,7 +5,7 @@ Migrate one repository at a time to the [portfolio CI standard](ci-policy.md). E
 ## 1. Inventory (read-only)
 
 1. Run `scripts/audit-ci.sh <repo>` and, when `gh` can read the repository, `CI_AUDIT_RULESET=live scripts/audit-ci.sh <repo>`. Keep the deviation list; it is the work list.
-2. List every workflow and every job's Taskfile target(s). For each lane decide: merge-blocking today → `ci-required` (fold into `task check`) or its own `ci-<lane>` job; not merge-blocking → a non-required workflow on `schedule`, `push: tags`, or `workflow_dispatch`.
+2. List every workflow and every job's Taskfile target(s). For each lane decide: merge-blocking today → `ci-required` (fold into `task check`) or its own `ci-<lane>` job; not merge-blocking → a non-required workflow on `schedule`, `push: tags`, or `workflow_dispatch`. A lane that must consume an artifact produced on a different runner in the same run (a cross-runner exchange) becomes origin `ci-*` jobs plus destination `ci-<lane>` jobs (never `ci-required`) that `needs:` them — under the conditions in [ci-policy.md](ci-policy.md#required-jobs); record the graph in the plan.
 3. Record the current required check names and whether the default branch uses a ruleset or legacy branch protection (`gh api repos/<o>/<r>/rules/branches/<default>`, `gh api repos/<o>/<r>/branches/<default>/protection`).
 4. Record which jobs run on self-hosted labels; those labels move to `runs-on` of the corresponding `ci-*` job.
 
@@ -15,7 +15,7 @@ Produce, per repository: the mapping from old jobs to `ci-required` / `ci-<lane>
 
 ## 3. Apply (on a feature branch, after approval)
 
-1. Copy `assets/ci.yml` to `.github/workflows/ci.yml`; set `runs-on`; add `ci-<lane>` jobs by duplicating `ci-required` and changing only the job name, `runs-on`, `timeout-minutes`, the `task ci-<lane>` step, and any job-level `env:`/`services:` the lane needs.
+1. Copy `assets/ci.yml` to `.github/workflows/ci.yml`; set `runs-on`; add `ci-<lane>` jobs by duplicating `ci-required` and changing only the job name, `runs-on`, `timeout-minutes`, the `task ci-<lane>` step, and any job-level `env:`/`services:` the lane needs. For a cross-runner exchange, add `needs:` on the destination `ci-<lane>` jobs only, listing origin `ci-*` jobs by name, and move artifacts with SHA-pinned `actions/upload-artifact` / `actions/download-artifact` steps; never read `needs.<job>.result` or `toJSON(needs)`.
 2. Copy `assets/ci-classify.sh` to `scripts/ci-classify.sh` unchanged and make it executable.
 3. Merge `assets/Taskfile.ci.yml` into `Taskfile.yml`: add `ci`, `docs-check`, `check`, and one `ci-<lane>` per extra job; point `check` and `docs-check` at the repository's existing commands.
 4. Remove `pull_request` and `pull_request_target` from every other workflow; delete workflows that only existed to certify PRs (dispatch/label/status-bridge workflows). Keep deep, security, fuzz, cross-platform, and release workflows on their non-PR triggers, pinned and with timeouts.
