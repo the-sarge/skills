@@ -16,7 +16,7 @@
 
 ## Purpose
 
-One CI shape for every repository: a `pull_request`-triggered workflow that skips draft PRs, one or more independent required jobs that each run one Taskfile target, and one identical default-branch ruleset. The shape is identical across repositories so that any workflow, ruleset, or merge problem is the same problem everywhere. Cost control comes from drafts (no CI during review) and from a docs-only shortcut inside `task ci`, not from orchestration cleverness in YAML.
+One CI shape for every repository: a `pull_request`-triggered workflow that skips draft PRs, one or more individually required jobs that each run one Taskfile target, and one identical default-branch ruleset. The shape is identical across repositories so that any workflow, ruleset, or merge problem is the same problem everywhere. Cost control comes from drafts (no CI during review) and from a docs-only shortcut inside `task ci`, not from orchestration cleverness in YAML.
 
 ## Responsibility boundary
 
@@ -40,12 +40,12 @@ Why drafts are safe, and what they are not: the job-level `if` skips the job on 
 
 ## Required jobs
 
-The workflow contains one or more independent required jobs:
+The workflow contains one or more required jobs, each a required check in its own right:
 
 - `ci-required` (always present) runs `task ci`.
 - `ci-<lane>` (optional, e.g. `ci-race`) runs `task ci-<lane>`. Use one when a lane must block merging *and* needs its own runner or timeout. Each `ci-<lane>` job repeats the guard, timeout, and pinned setup steps, sets its own `runs-on`, and appears in the ruleset's required checks.
 - A job may add a job-level `env:` mapping repository secrets or variables the Taskfile target consumes (for example a private-module token), and a `ci-<lane>` job may declare `services:` or `container:` when the lane needs them; the Taskfile still owns what runs. Apart from the cross-runner exchange below, nothing else varies.
-- No job uses `strategy.matrix`, and no job aggregates or summarizes other jobs (no step or expression reads `needs.<job>.result`). Each required job either ran and passed or is absent, and absence blocks the merge. That is the fail-closed guarantee, and it needs no aggregation script.
+- No job uses `strategy.matrix`, and no job aggregates or summarizes other jobs (no step or expression reads `needs.<job>.result`). Every `ci-*` job is individually required, so the merge is blocked unless each one reports a real success: a missing check blocks, a failed origin blocks through its own red check, and a downstream job skipped after an origin failure is harmless because the origin already blocks. That is the fail-closed guarantee, and it needs no aggregation script.
 - `needs:` is permitted only for a **cross-runner artifact exchange**: a destination `ci-<lane>` job (never `ci-required`) that must consume an artifact produced on a different runner in the same run (for example, bundles created natively on Linux, macOS, and Windows, each verified on every other OS). Conditions: every `needs` target is a `ci-*` job in the same `ci.yml` (so it is itself a required check and a failed upstream blocks the merge through its own check, not through a skipped downstream); the downstream job keeps the standard guard and does not use `always()`, `failure()`, or `cancelled()`; artifacts move with SHA-pinned `actions/upload-artifact` / `actions/download-artifact` steps inside the run (the job still has exactly one `task` run step); no job in the graph reads dependency results (`needs.<job>.result`, `needs.*.result`, `toJSON(needs)`) — `needs.<job>.outputs.<name>` is fine; and the job graph is recorded in the repository's migration notes. Write each OS job out explicitly rather than using a matrix so check names stay stable. Committing representative fixtures is a backward-compatibility test, not a substitute for the same-run exchange, and belongs in a non-required workflow.
 
 Choice rule: a lane that is merge-blocking today becomes a `ci-<lane>` job; a lane that is not merge-blocking moves to a [non-required workflow](#non-required-workflows).

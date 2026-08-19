@@ -118,8 +118,13 @@ else
       fi
     fi
     # Aggregation: any GitHub expression that reads dependency results (dotted, wildcard, bracketed, or the whole
-    # needs context). Only text inside ${{ }} counts; needs.<job>.outputs.<name> stays allowed.
-    if printf '%s' "$jobjson" | jq -e '[.. | strings | scan("\\$\\{\\{.*?\\}\\}")] | any(test("needs[[:space:]]*(\\.[[:space:]]*([A-Za-z0-9_-]+|\\*)|\\[[^]]*\\])[[:space:]]*\\.[[:space:]]*result|tojson[[:space:]]*\\([[:space:]]*needs[[:space:]]*\\)"; "i"))' >/dev/null 2>&1; then
+    # needs context). Expression text is every ${{ }} fragment anywhere in the job plus the job-level and step-level
+    # `if` values, which GitHub evaluates as expressions even without delimiters. needs.<job>.outputs.<name> stays allowed.
+    if printf '%s' "$jobjson" | jq -e '
+        ([.. | strings | scan("\\$\\{\\{.*?\\}\\}")]
+         + [(.if // "" | tostring)]
+         + [((.steps? // []) | if type=="array" then .[] else empty end | if type=="object" then (.if // "" | tostring) else "" end)])
+        | any(test("needs[[:space:]]*(\\.[[:space:]]*([A-Za-z0-9_-]+|\\*)|\\[[^]]*\\])[[:space:]]*\\.[[:space:]]*result|tojson[[:space:]]*\\([[:space:]]*needs[[:space:]]*\\)"; "i"))' >/dev/null 2>&1; then
       deviate CI-AGGREGATE "ci.yml: job $job reads dependency results (needs.<job>.result, needs.*.result, or toJSON(needs)); jobs must not aggregate other jobs — each ci-* job is required on its own"
     fi
     jj '(has("strategy")|not) or ((.strategy|type=="object") and (.strategy.matrix == null))' \

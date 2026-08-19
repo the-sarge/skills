@@ -233,6 +233,9 @@ mutate CI-AGGREGATE "$exchange_lane"' | .jobs["ci-race"].env.UPSTREAM = "${{ nee
 mutate CI-AGGREGATE "$exchange_lane"' | .jobs["ci-race"].env.UPSTREAM = "${{ Needs[ '"'"'ci-required'"'"' ].Result }}"'
 mutate CI-AGGREGATE "$exchange_lane"' | .jobs["ci-race"].if = "${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository && needs.*.result != '"'"'failure'"'"' }}"'
 mutate CI-AGGREGATE "$exchange_lane"' | .jobs["ci-race"].env.ALL = "${{ toJSON(needs) }}"'
+# job-level and step-level if are expressions even without ${{ }} delimiters
+mutate CI-AGGREGATE "$exchange_lane"' | .jobs["ci-race"].if = "!github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository && needs.ci-required.result == '"'"'success'"'"'"'
+mutate CI-AGGREGATE "$exchange_lane"' | .jobs["ci-race"].steps[-1].if = "needs.ci-required.result == '"'"'success'"'"'"'
 # inert text and dependency outputs are not aggregation
 inert="$tmp/inert"
 make_conformant_repo "$inert"

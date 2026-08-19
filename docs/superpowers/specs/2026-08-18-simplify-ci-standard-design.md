@@ -69,7 +69,7 @@ Rules:
 
 ### Required jobs
 
-The workflow contains one or more independent required jobs. Each:
+The workflow contains one or more required jobs, each a required check in its own right. Each:
 
 - is named `ci-required` (the default job) or `ci-<lane>` (an additional merge-blocking lane, e.g. `ci-race`);
 - carries the same `if` guard, timeout, and pinned setup steps;
@@ -77,7 +77,7 @@ The workflow contains one or more independent required jobs. Each:
 - runs exactly one Taskfile target (`task ci` for `ci-required`, `task ci-<lane>` for others);
 - is not aggregated by any other job and declares no `needs:`, except for a cross-runner artifact exchange (amended 2026-08-19): a destination `ci-<lane>` job may `needs:` origin `ci-*` jobs in the same workflow when it must consume an artifact produced on a different runner in the same run; every job in that graph is itself a required check, the downstream job does not use `always()`/`failure()`/`cancelled()`, and no job reads `needs.<job>.result`.
 
-The choice rule: a lane that is merge-blocking today becomes a standalone `ci-<lane>` job; a lane that is not merge-blocking moves to a non-required workflow. Every job in the graph is individually required, so each required check either ran and passed or is absent, and absence blocks the merge: a failed origin blocks through its own red check, and a downstream job skipped after an origin failure is harmless because the origin is required. This is fail-closed without any aggregation script.
+The choice rule: a lane that is merge-blocking today becomes a standalone `ci-<lane>` job; a lane that is not merge-blocking moves to a non-required workflow. Every job in the graph is individually required, so the merge is blocked unless each `ci-*` check reports a real success: a missing check blocks, a failed origin blocks through its own red check, and a downstream job skipped after an origin failure is harmless because the origin already blocks. This is fail-closed without any aggregation script.
 
 ### Taskfile contract
 
