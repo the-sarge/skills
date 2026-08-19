@@ -8,10 +8,11 @@ Migrate one repository at a time to the [portfolio CI standard](ci-policy.md). E
 2. List every workflow and every job's Taskfile target(s). For each lane decide: merge-blocking today → `ci-required` (fold into `task check`) or its own `ci-<lane>` job; not merge-blocking → a non-required workflow on `schedule`, `push: tags`, or `workflow_dispatch`. A lane that must consume an artifact produced on a different runner in the same run (a cross-runner exchange) becomes origin `ci-*` jobs plus destination `ci-<lane>` jobs (never `ci-required`) that `needs:` them — under the conditions in [ci-policy.md](ci-policy.md#required-jobs); record the graph in the plan.
 3. Record the current required check names and whether the default branch uses a ruleset or legacy branch protection (`gh api repos/<o>/<r>/rules/branches/<default>`, `gh api repos/<o>/<r>/branches/<default>/protection`).
 4. Record which jobs run on self-hosted labels; those labels move to `runs-on` of the corresponding `ci-*` job.
+5. Grep every workflow, script, Taskfile, and doc for every caller of a Taskfile target that the migration renames or redefines (`task ci` becomes the fast PR gate; `check`/`docs-check` may absorb old lanes). Decide each caller explicitly. Release and scheduled workflows call purpose-named targets (`release-gate`, `nightly`), never `task ci` or `task ci-<lane>`: those classify against a PR merge base that does not exist on a tag or schedule and are deliberately the narrow gate, so a release that keeps calling `task ci` silently validates less than before (the audit reports this as `WF-TASK-CI`).
 
 ## 2. Plan (no edits)
 
-Produce, per repository: the mapping from old jobs to `ci-required` / `ci-<lane>` / non-required workflows; the `runs-on` per job; the `task check` and `task docs-check` bodies (existing lanes renamed, not rewritten); any `CI_DOCS_GLOBS` extension; the ruleset diff including any `ci-<lane>` contexts to add; and the bootstrap note below.
+Produce, per repository: the mapping from old jobs to `ci-required` / `ci-<lane>` / non-required workflows; the `runs-on` per job; the `task check` and `task docs-check` bodies (existing lanes renamed, not rewritten); any `CI_DOCS_GLOBS` extension; the ruleset diff including any `ci-<lane>` contexts to add; and the bootstrap note below; and, for every caller found in §1.5, the purpose-named target it will call (for example `release-gate` = `check` + `deep-check` + `sast`) and the body of that target.
 
 ## 3. Apply (on a feature branch, after approval)
 
@@ -19,8 +20,9 @@ Produce, per repository: the mapping from old jobs to `ci-required` / `ci-<lane>
 2. Copy `assets/ci-classify.sh` to `scripts/ci-classify.sh` unchanged and make it executable.
 3. Merge `assets/Taskfile.ci.yml` into `Taskfile.yml`: add `ci`, `docs-check`, `check`, and one `ci-<lane>` per extra job; point `check` and `docs-check` at the repository's existing commands.
 4. Remove `pull_request` and `pull_request_target` from every other workflow; delete workflows that only existed to certify PRs (dispatch/label/status-bridge workflows). Keep deep, security, fuzz, cross-platform, and release workflows on their non-PR triggers, pinned and with timeouts.
-5. Run `task ci` locally on the branch (expect the docs-only or full path as appropriate); run `scripts/audit-ci.sh .` and expect `- None. Repository conforms to the standard.`; then run `CI_AUDIT_RULESET=live scripts/audit-ci.sh .` and expect only `RULES-*` deviations before the ruleset is applied and none after.
-6. Commit. Do not open the PR yet.
+5. Define the purpose-named targets planned in §2 in `Taskfile.yml` and repoint every caller from §1.5 (`task ci` / `task ci-<lane>` in release or scheduled workflows, scripts, docs) to them; rename steps whose names no longer describe what runs.
+6. Run `task ci` locally on the branch (expect the docs-only or full path as appropriate); run `scripts/audit-ci.sh .` and expect `- None. Repository conforms to the standard.`; then run `CI_AUDIT_RULESET=live scripts/audit-ci.sh .` and expect only `RULES-*` deviations before the ruleset is applied and none after.
+7. Commit. Do not open the PR yet.
 
 ## 4. Bootstrap warning
 

@@ -179,6 +179,13 @@ if test -d "$workflow_dir"; then
     if printf '%s' "$owf" | jq -e '.on | if type=="string" then (.=="pull_request" or .=="pull_request_target") elif type=="array" then (index("pull_request")!=null or index("pull_request_target")!=null) elif type=="object" then (has("pull_request") or has("pull_request_target")) else false end' >/dev/null 2>&1; then
       deviate WF-PR-TRIGGER "$rel: only ci.yml may use pull_request or pull_request_target; move this workflow to schedule, push tags, or workflow_dispatch"
     fi
+    # `task ci` / `task ci-<lane>` are the PR merge gate: they classify against a PR merge base (absent on a tag or
+    # schedule) and are deliberately the fast path. A non-required workflow must call a purpose-named target instead
+    # (for example `task release-gate` or `task nightly`) so it does not silently inherit the narrower gate.
+    ci_calls="$(printf '%s' "$ojobs" | jq -r '[.[] | (if type=="object" then (.steps? // []) else [] end) | (if type=="array" then . else [] end) | .[] | select(type=="object" and has("run")) | (.run|tostring) | scan("(?:^|[[:space:]&|;(<>`])task[[:space:]]+(ci(?:-[A-Za-z0-9_-]+)?)(?=$|[[:space:]&|;)<>`])") | .[0]] | unique | .[]' 2>/dev/null || true)"
+    if test -n "$ci_calls"; then
+      deviate WF-TASK-CI "$rel: runs $(printf '%s\n' "$ci_calls" | sed 's/.*/`task &`/' | paste -sd, - | sed 's/,/, /g'); ci and ci-<lane> are the PR merge gate (fast path, classified against a PR merge base) — call a purpose-named Taskfile target such as release-gate or nightly instead"
+    fi
     missing_timeouts="$(printf '%s' "$ojobs" | jq -r '[to_entries[] | select((.value | if type=="object" then .["timeout-minutes"] else null end) == null) | .key] | join(", ")' 2>/dev/null)" || missing_timeouts=''
     if test -n "$missing_timeouts"; then
       deviate WF-TIMEOUT "$rel: jobs missing timeout-minutes: $missing_timeouts"

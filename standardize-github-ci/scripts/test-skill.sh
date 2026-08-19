@@ -367,6 +367,43 @@ git -C "$other" add . && git -C "$other" commit -qm target
 run_audit "$other"; out="$audit_out"
 expect_deviation "$out" WF-PR-TRIGGER
 
+# a non-required workflow that runs `task ci` inherits the fast PR gate (and classifies against a PR merge base that
+# does not exist on a tag or schedule); it must call a purpose-named target instead
+rel="$tmp/release"
+make_conformant_repo "$rel"
+cat > "$rel/.github/workflows/release.yml" <<'YAML'
+name: release
+on:
+  push:
+    tags: ['v*']
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Run complete validation
+        run: task ci
+      - run: |
+          echo build
+          task ci-race
+      - run: task ci>/dev/null
+      - run: 'test -n "`task ci-portable-linux`"'
+      - run: task cicd && task ci_fast && task ci-
+YAML
+git -C "$rel" add . && git -C "$rel" commit -qm release
+run_audit "$rel"; out="$audit_out"
+test "$audit_rc" -eq 3 || fail "audit: non-required workflow running task ci must exit 3:
+$out"
+expect_deviation "$out" WF-TASK-CI
+printf '%s\n' "$out" | rg -Fq 'release.yml: runs `task ci`, `task ci-portable-linux`, `task ci-race`' || fail "audit: WF-TASK-CI must name exactly the ci targets it found (not cicd/ci_fast/ci-):
+$out"
+yq -i '.jobs.publish.steps[1].run = "task release-gate" | .jobs.publish.steps[2].run = "task build" | .jobs.publish.steps[3].run = "task release-gate>/dev/null" | .jobs.publish.steps[4].run = "task nightly"' "$rel/.github/workflows/release.yml"
+git -C "$rel" commit -qam release-gate
+run_audit "$rel"; out="$audit_out"
+test "$audit_rc" -eq 0 || fail "audit: non-required workflow calling a purpose-named target must be conformant:
+$out"
+
 # local composite actions and docker:// images carry no ref to pin and must not be flagged
 localact="$tmp/localaction"
 make_conformant_repo "$localact"
@@ -615,6 +652,11 @@ fi
 
 migration="$skill_root/references/migration.md"
 rg -Fq 'gh pr ready' "$migration" || fail 'migration.md: must describe marking the PR ready'
+rg -Fq 'every caller' "$migration" || fail 'migration.md: must require an inventory of every caller of a renamed or redefined Taskfile target'
+rg -Fq 'for every caller found in §1.5, the purpose-named target it will call' "$migration" || fail 'migration.md §2: plan must map each caller to its purpose-named target'
+rg -Fq 'Define the purpose-named targets planned in §2' "$migration" || fail 'migration.md §3: apply must define the targets and repoint callers'
+rg -Fq 'never `task ci` or `task ci-<lane>`' "$policy" || fail 'ci-policy.md: non-required workflows must call purpose-named targets, never task ci or ci-<lane>'
+rg -Fq 'never `task ci` or `task ci-<lane>`' "$skill_root/SKILL.md" || fail 'SKILL.md: audit summary must cover both task ci and task ci-<lane>'
 rg -Fq 'gh pr merge --squash --match-head-commit' "$migration" || fail 'migration.md: must describe the exact-head squash merge'
 rg -Fq 'assets/ruleset.json' "$migration" || fail 'migration.md: must apply the ruleset asset'
 rg -Fq 'gh pr create --draft' "$migration" || fail 'migration.md: must open the migration PR as a draft'
