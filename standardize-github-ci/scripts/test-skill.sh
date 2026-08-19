@@ -327,12 +327,40 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: task race
+  # a reusable-workflow call cannot carry timeout-minutes; the called workflow owns its timeouts
+  windows_contracts:
+    uses: ./.github/workflows/windows-contracts.yml
+    with:
+      lane: portable
 YAML
 git -C "$other" add . && git -C "$other" commit -qm deep
 run_audit "$other"; out="$audit_out"
 test "$audit_rc" -eq 0 || fail "audit: scheduled non-required workflow must be conformant:
 $out"
 printf '%s\n' "$out" | rg -Fq '`deep-ci.yml`' || fail 'audit: must list other workflows'
+
+# malformed or empty job-level uses must not exempt a job from the timeout rule
+cat > "$other/.github/workflows/malformed.yml" <<'YAML'
+name: malformed
+on:
+  workflow_dispatch:
+jobs:
+  scalar_job: just-a-string
+  null_uses:
+    uses:
+  empty_uses:
+    uses: ""
+  numeric_uses:
+    uses: 42
+  fine:
+    uses: ./.github/workflows/x.yml
+YAML
+git -C "$other" add . && git -C "$other" commit -qm malformed
+run_audit "$other"; out="$audit_out"
+test "$audit_rc" -eq 3 || fail 'audit: malformed uses jobs must exit 3'
+printf '%s\n' "$out" | rg -Fq 'malformed.yml: jobs missing timeout-minutes: scalar_job, null_uses, empty_uses, numeric_uses' || fail "audit: WF-TIMEOUT must name each malformed job and spare the valid reusable caller:
+$out"
+git -C "$other" rm -q .github/workflows/malformed.yml && git -C "$other" commit -qm rm-malformed
 
 cat > "$other/.github/workflows/preflight.yml" <<'YAML'
 name: preflight
@@ -683,6 +711,7 @@ rg -Fq 'every caller' "$migration" || fail 'migration.md: must require an invent
 rg -Fq 'for every caller found in §1.5, the purpose-named target it will call' "$migration" || fail 'migration.md §2: plan must map each caller to its purpose-named target'
 rg -Fq 'Define the purpose-named targets planned in §2' "$migration" || fail 'migration.md §3: apply must define the targets and repoint callers'
 rg -Fq 'never `task ci` or `task ci-<lane>`' "$policy" || fail 'ci-policy.md: non-required workflows must call purpose-named targets, never task ci or ci-<lane>'
+rg -Fq 'cannot carry `timeout-minutes`' "$policy" || fail 'ci-policy.md: must qualify the timeout rule for reusable-workflow callers'
 rg -Fq '`task release-gate`' "$policy" || fail 'ci-policy.md: tag-push release workflows must run task release-gate'
 rg -Fq 'Every tag-push release workflow calls `task release-gate`' "$migration" || fail 'migration.md: must mandate task release-gate for tag-push workflows'
 rg -Fq 'tag-push release workflows run `task release-gate`' "$skill_root/SKILL.md" || fail 'SKILL.md: audit guidance must name task release-gate'
