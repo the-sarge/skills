@@ -148,6 +148,20 @@ gh_out="$tmp/github-output"
 (cd "$cls_repo" && GITHUB_OUTPUT="$gh_out" CI_DEFAULT_BRANCH=main "$classify" >/dev/null 2>&1)
 test "$(cat "$gh_out")" = 'docs_only=false' || fail 'classifier: GITHUB_OUTPUT mirror'
 
+# non-ASCII and newline-bearing pathnames: git quotes them unless core.quotePath=false and -z are used
+git -C "$cls_repo" checkout -q main
+git -C "$cls_repo" checkout -qb odd-names
+mkdir -p "$cls_repo/platform" && printf 'x\n' > "$cls_repo/platform/café.go" && printf 'y\n' > "$cls_repo/platform/new
+line.go"
+git -C "$cls_repo" add . && git -C "$cls_repo" commit -qm oddnames
+test "$(classify_in CI_DEFAULT_BRANCH=main CI_MATCH_GLOBS='platform/*')" = 'matches=true' || fail 'classifier: non-ASCII / newline pathnames must still match in match mode'
+git -C "$cls_repo" checkout -q main
+git -C "$cls_repo" checkout -qb odd-docs
+printf 'doc\n' > "$cls_repo/naïve.md"
+git -C "$cls_repo" add . && git -C "$cls_repo" commit -qm odddocs
+test "$(classify_in CI_DEFAULT_BRANCH=main)" = 'docs_only=true' || fail 'classifier: non-ASCII markdown must still be docs-only'
+git -C "$cls_repo" checkout -q src-branch
+
 # CI_MATCH_GLOBS mode: does any changed file match these globs? (path-gated ci-<lane> targets use it)
 # src-branch is checked out here: its diff against main is only pkg/pkg.go
 test "$(classify_in CI_DEFAULT_BRANCH=main CI_MATCH_GLOBS='pkg/*')" = 'matches=true' || fail 'classifier: CI_MATCH_GLOBS must report a matching change'
@@ -160,6 +174,11 @@ git -C "$cls_repo" checkout -q src-branch
 (cd "$cls_repo" && GITHUB_OUTPUT="$gh_out" CI_DEFAULT_BRANCH=main CI_MATCH_GLOBS='pkg/*' "$classify" >/dev/null 2>&1)
 test "$(cat "$gh_out")" = 'matches=true' || fail 'classifier: CI_MATCH_GLOBS must mirror matches= to GITHUB_OUTPUT'
 test "$(classify_in CI_DEFAULT_BRANCH=main CI_MATCH_GLOBS='pkg/*' | wc -l | tr -d ' ')" = 1 || fail 'classifier: CI_MATCH_GLOBS mode must print exactly one line'
+# set-but-empty CI_MATCH_GLOBS is match mode with no globs: fail closed to matches=true (an undefined Taskfile var)
+test "$(classify_in CI_DEFAULT_BRANCH=main CI_MATCH_GLOBS='')" = 'matches=true' || fail 'classifier: empty CI_MATCH_GLOBS must fail closed to matches=true'
+: > "$gh_out"
+(cd "$cls_repo" && GITHUB_OUTPUT="$gh_out" CI_DEFAULT_BRANCH=main CI_MATCH_GLOBS='' "$classify" >/dev/null 2>&1)
+test "$(cat "$gh_out")" = 'matches=true' || fail 'classifier: empty CI_MATCH_GLOBS must mirror matches=true to GITHUB_OUTPUT'
 
 # no globbing against the working tree: without set -f, docs/* would pathname-expand to the
 # existing docs/nested directory and no longer match docs/nested/only.txt, yielding false
@@ -724,6 +743,10 @@ rg -Fq 'types: [opened, synchronize, reopened, ready_for_review]' "$policy" || f
 rg -Fq 'ci-<lane>' "$policy" || fail 'ci-policy.md: must define ci-<lane> jobs'
 rg -Fq 'cross-runner artifact exchange' "$policy" || fail 'ci-policy.md: must define the needs: exception for cross-runner artifact exchange'
 rg -Fq 'CI_MATCH_GLOBS' "$policy" || fail 'ci-policy.md: must describe path-gated ci-<lane> targets via CI_MATCH_GLOBS'
+rg -Fq 'fold into `task check`' "$policy" || fail 'ci-policy.md: choice rule must include the fold-into-check branch'
+rg -Fq 'hosted runner' "$policy" || fail 'ci-policy.md: Runners section must carry the hosted-runner cost rule'
+rg -Fq 'path-gated' "$skill_root/SKILL.md" || fail 'SKILL.md: audit checklist must record path-gated lanes and hosted runners'
+rg -Fq 'glob variable' "$skill_root/references/migration.md" || fail 'migration.md: plan/apply must carry each gated lane glob variable'
 rg -Fq 'path-gated' "$skill_root/references/migration.md" || fail 'migration.md: must tell migrators to path-gate conditional lanes inside the Taskfile'
 if rg -qi 'never add `needs`' "$workflow_asset"; then fail 'ci.yml: header must not contradict the cross-runner exchange exception'; fi
 rg -Fq 'upload-artifact' "$skill_root/SKILL.md" || fail 'SKILL.md: Apply must authorize the artifact steps an exchange needs'

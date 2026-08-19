@@ -15,8 +15,9 @@
 #   CI_REMOTE          remote name (default: origin)
 #   CI_DOCS_GLOBS      space-separated shell globs treated as documentation
 #                      (default: '*.md docs/* DEV-JOURNAL.md LICENSE LICENSE.*')
-#   CI_MATCH_GLOBS     when set, switch to match mode: space-separated shell globs a
-#                      lane cares about (for example 'codec/* internal/codec/*')
+#   CI_MATCH_GLOBS     when set (even empty), switch to match mode: space-separated shell
+#                      globs a lane cares about (for example 'codec/* internal/codec/*');
+#                      empty => matches=true (fail closed)
 set -euo pipefail
 set -f # never pathname-expand the globs
 
@@ -25,8 +26,10 @@ head="${CI_HEAD_SHA:-HEAD}"
 docs_globs="${CI_DOCS_GLOBS:-*.md docs/* DEV-JOURNAL.md LICENSE LICENSE.*}"
 match_globs="${CI_MATCH_GLOBS:-}"
 
+# Mode is selected by the presence of CI_MATCH_GLOBS, not its content: a set-but-empty value
+# (for example an undefined Taskfile variable) is match mode with no globs and fails closed to true.
 key=docs_only
-test -z "$match_globs" || key=matches
+test -z "${CI_MATCH_GLOBS+x}" || key=matches
 
 emit() {
   printf '%s=%s\n' "$key" "$1"
@@ -61,14 +64,25 @@ if test -z "$base" || ! git rev-parse --verify -q "$base^{commit}" >/dev/null ||
   fail_closed
 fi
 
-changed="$(git diff --name-only --no-renames "$base" "$head")"
-if test -z "$changed"; then
+# Pathnames are read NUL-delimited with quoting disabled so non-ASCII and newline-bearing
+# names are compared as-is (git would otherwise quote them, breaking the glob match).
+changed_list="$(mktemp)"
+trap 'rm -f "$changed_list"' EXIT
+if ! git -c core.quotePath=false diff --name-only --no-renames -z "$base" "$head" > "$changed_list"; then
+  printf 'ci-classify: git diff failed; failing closed\n' >&2
+  fail_closed
+fi
+if ! test -s "$changed_list"; then
   printf 'ci-classify: empty diff; failing closed\n' >&2
   fail_closed
 fi
 
 if test "$key" = matches; then
-  while IFS= read -r path; do
+  if test -z "$match_globs"; then
+    printf 'ci-classify: CI_MATCH_GLOBS is empty; failing closed (lane runs)\n' >&2
+    emit true
+  fi
+  while IFS= read -r -d '' path; do
     test -n "$path" || continue
     for glob in $match_globs; do
       # shellcheck disable=SC2254
@@ -76,11 +90,11 @@ if test "$key" = matches; then
         $glob) printf 'ci-classify: %s matches %s\n' "$path" "$glob" >&2; emit true ;;
       esac
     done
-  done <<< "$changed"
+  done < "$changed_list"
   emit false
 fi
 
-while IFS= read -r path; do
+while IFS= read -r -d '' path; do
   test -n "$path" || continue
   matched=false
   for glob in $docs_globs; do
@@ -93,6 +107,6 @@ while IFS= read -r path; do
     printf 'ci-classify: %s is not documentation\n' "$path" >&2
     emit false
   fi
-done <<< "$changed"
+done < "$changed_list"
 
 emit true
