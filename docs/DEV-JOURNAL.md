@@ -227,3 +227,14 @@ Path-gated `ci-<lane>` targets are now a concrete mechanism, and the classifier 
 ### Next
 
 - Sync to dotfiles. Already-migrated repositories (codemux, tapmux, gridcast) carry the older `ci-classify.sh`; re-copy it from the asset on their next touch so non-ASCII documentation paths classify correctly. Wellspring plan guidance issued (codec matrices off the PR gate, hosted-Linux lanes collapsed, path-gated lanes, standard checkout with `sparse-checkout`). Live view: [issue #8](https://github.com/the-sarge/skills/issues/8).
+
+---
+
+## Correction: path-gated lanes validation SHA - 2026-08-19 14:04 EDT
+
+**Main:** `4843796510c2`
+**Actor:** Claude
+
+### Correction
+
+The preceding entry's Validation line says the `mktemp` guard was "fixed in `7d0cabc`". That SHA is the previous journal commit (#18), not the fix. The guard was PR #19's last branch commit `8170aa9`, which landed inside squash commit `af9f4d4`.
