@@ -77,3 +77,36 @@ One draft-gated `pull_request` CI standard replaced the dispatch, one-shot label
 
 - Migrate repositories one at a time by running `standardize-github-ci`: codemux first, then tapmux, wiremux, gridcast, wellspring (last; `ci-race` on the xlarge runner). Each migration PR is the live test of the standard.
 - Follow-ups: run the harness's optional `task ci` block under `env -u GITHUB_BASE_REF -u GITHUB_OUTPUT`; change `references/migration.md` §7.1 to print `databaseId,createdAt,conclusion`. Live view: [issue #8](https://github.com/the-sarge/skills/issues/8).
+
+---
+
+## needs: narrowed to cross-runner artifact exchanges - 2026-08-19 10:57 EDT
+
+**Main:** `fe632fd4cb33`
+**Actor:** Claude
+
+### Summary
+
+The CI standard's blanket `needs:` ban was narrowed to the hazard it guarded against. Landed on `main` as squash commit `fe632fd` from [PR #11](https://github.com/the-sarge/skills/pull/11), a follow-up to [issue #8](https://github.com/the-sarge/skills/issues/8) prompted by the wellspring audit, whose portability test builds bundles natively on Linux, macOS, and Windows and verifies each on every other OS in the same run.
+
+### Completed
+
+- `standardize-github-ci/references/ci-policy.md` and the design spec now permit `needs:` only for a cross-runner artifact exchange: a destination `ci-<lane>` job (never `ci-required`) may depend on origin `ci-*` jobs in the same `ci.yml`; every node is a required check in its own right; the destination keeps the standard guard and calls no status function; artifacts move with SHA-pinned upload/download-artifact steps; no job uses the `needs` context for anything but `needs.<job>.outputs.<name>`. Matrices stay forbidden; committed fixtures are a backward-compatibility test for a non-required workflow, not a substitute.
+- `scripts/audit-ci.sh`: `CI-NEEDS` enforces the exception (destination-only, literal `ci-*` targets present in the file, no self-edge, case-insensitive and whitespace-tolerant rejection of `always()`/`failure()`/`cancelled()`/`success()`), reports artifact-exchange edges, and a new `CI-AGGREGATE` fails closed on any non-outputs use of the `needs` context across `${{ }}` fragments (spanning lines) and job- and step-level `if` values.
+- `scripts/test-skill.sh`: fixtures for each `CI-NEEDS` rejection, seven `CI-AGGREGATE` spellings (dotted, bracketed, wildcard, `toJSON(needs)`, unwrapped `if`, multi-line, bare `.outputs`), an inert-text/named-outputs control, and a conformant forward-referenced two-origin exchange with pinned artifact steps; policy, asset-header, SKILL.md, and spec greps.
+- `assets/ci.yml` header, `SKILL.md` Apply allowlist, and `references/migration.md` §1.2/§3.1 aligned.
+
+### Decisions
+
+- A standard should forbid the hazard, not the syntax: fail-closed depends on every job that matters being individually required, which `RULES-CHECKS` already enforces; `needs:` between individually required `ci-*` jobs preserves it, while aggregate jobs and any dependency-result read do not. Rationale in the spec's Required jobs section (amended 2026-08-19) and PR #11.
+- Rejected: parsing GitHub expression grammar to avoid a false positive on a string literal that spells a needs-result access; the audit stays a canonical-subset checker and fails closed there.
+
+### Validation
+
+- Round 1 RAS review (run `20260819T135451`) and three verifications at `893adb9`, `3f62de0`, `05d657e`; replacement review (run `20260819T143925`) at `c99ece6` found one distinct root (`!success()` skip-after-green), fixed in `4f5a549`; the review-round override is recorded here.
+- `standardize-github-ci/scripts/test-skill.sh` printed `skill fixtures passed` under default bash and `/bin/bash` 3.2 at `4f5a549`; shellcheck and actionlint clean.
+- Deferred with reason: `continue-on-error` on `ci-*` jobs is unaudited and its effect on the published check needs a hosted observation before a rule is added.
+
+### Next
+
+- Sync the changed skill into dotfiles; then migrate repositories starting with codemux, and wellspring last using the exchange exception for its portability lanes. Live view: [issue #8](https://github.com/the-sarge/skills/issues/8).
