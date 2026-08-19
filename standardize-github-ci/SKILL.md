@@ -36,7 +36,8 @@ Never treat an audit or plan request as authorization to edit files, change GitH
 Report the audit output plus:
 
 - every workflow's current triggers and which lanes it runs, the proposed destination of each lane (`ci-required`, `ci-<lane>`, or a non-required workflow), and every caller of a Taskfile target the migration renames or redefines (tag-push release workflows run `task release-gate`; scheduled workflows use `nightly` or a descriptive name; never `task ci` or `task ci-<lane>`);
-- self-hosted runner labels in use;
+- self-hosted runner labels in use, and every GitHub-hosted runner a proposed required job would use (hosted required jobs start on every PR run, docs-only included; call that out);
+- which proposed `ci-<lane>` jobs are path-gated, with the glob variable each will use;
 - the current required check names and whether enforcement is a ruleset or legacy protection;
 - anything the standard cannot express for this repository, stated as an exception with evidence.
 

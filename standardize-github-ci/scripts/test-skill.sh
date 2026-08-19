@@ -74,11 +74,12 @@ fi
 
 test -f "$taskfile_asset" || fail "missing $taskfile_asset"
 yq eval '.' "$taskfile_asset" >/dev/null
-for t in ci ci-race docs-check check release-gate; do
+for t in ci ci-race ci-platform docs-check check release-gate; do
   test "$(yq -r ".tasks | has(\"$t\")" "$taskfile_asset")" = true || fail "Taskfile.ci.yml: missing task $t"
 done
 rg -Fq 'scripts/ci-classify.sh' "$taskfile_asset" || fail 'Taskfile.ci.yml: ci must call scripts/ci-classify.sh'
 rg -Fq 'docs_only=true' "$taskfile_asset" || fail 'Taskfile.ci.yml: ci must branch on docs_only=true'
+rg -Fq 'CI_MATCH_GLOBS' "$taskfile_asset" || fail 'Taskfile.ci.yml: must show a path-gated ci-<lane> using CI_MATCH_GLOBS'
 
 test -f "$ruleset_asset" || fail "missing $ruleset_asset"
 jq -e '.target == "branch" and .enforcement == "active"' "$ruleset_asset" >/dev/null || fail 'ruleset.json: target/enforcement'
@@ -146,6 +147,43 @@ gh_out="$tmp/github-output"
 : > "$gh_out"
 (cd "$cls_repo" && GITHUB_OUTPUT="$gh_out" CI_DEFAULT_BRANCH=main "$classify" >/dev/null 2>&1)
 test "$(cat "$gh_out")" = 'docs_only=false' || fail 'classifier: GITHUB_OUTPUT mirror'
+
+# non-ASCII and newline-bearing pathnames: git quotes them unless core.quotePath=false and -z are used
+git -C "$cls_repo" checkout -q main
+git -C "$cls_repo" checkout -qb odd-names
+mkdir -p "$cls_repo/platform" && printf 'x\n' > "$cls_repo/platform/café.go" && printf 'y\n' > "$cls_repo/platform/new
+line.go"
+git -C "$cls_repo" add . && git -C "$cls_repo" commit -qm oddnames
+test "$(classify_in CI_DEFAULT_BRANCH=main CI_MATCH_GLOBS='platform/*')" = 'matches=true' || fail 'classifier: non-ASCII / newline pathnames must still match in match mode'
+git -C "$cls_repo" checkout -q main
+git -C "$cls_repo" checkout -qb odd-docs
+printf 'doc\n' > "$cls_repo/naïve.md"
+git -C "$cls_repo" add . && git -C "$cls_repo" commit -qm odddocs
+test "$(classify_in CI_DEFAULT_BRANCH=main)" = 'docs_only=true' || fail 'classifier: non-ASCII markdown must still be docs-only'
+git -C "$cls_repo" checkout -q src-branch
+
+# CI_MATCH_GLOBS mode: does any changed file match these globs? (path-gated ci-<lane> targets use it)
+# src-branch is checked out here: its diff against main is only pkg/pkg.go
+test "$(classify_in CI_DEFAULT_BRANCH=main CI_MATCH_GLOBS='pkg/*')" = 'matches=true' || fail 'classifier: CI_MATCH_GLOBS must report a matching change'
+test "$(classify_in CI_DEFAULT_BRANCH=main CI_MATCH_GLOBS='docs/* *.md')" = 'matches=false' || fail 'classifier: CI_MATCH_GLOBS must report no match when only other paths changed'
+test "$(classify_in CI_DEFAULT_BRANCH=does-not-exist CI_MATCH_GLOBS='docs/*')" = 'matches=true' || fail 'classifier: CI_MATCH_GLOBS must fail closed to matches=true without a base'
+git -C "$cls_repo" checkout -q main
+test "$(classify_in CI_DEFAULT_BRANCH=main CI_MATCH_GLOBS='docs/*')" = 'matches=true' || fail 'classifier: CI_MATCH_GLOBS must fail closed to matches=true on an empty diff'
+git -C "$cls_repo" checkout -q src-branch
+: > "$gh_out"
+(cd "$cls_repo" && GITHUB_OUTPUT="$gh_out" CI_DEFAULT_BRANCH=main CI_MATCH_GLOBS='pkg/*' "$classify" >/dev/null 2>&1)
+test "$(cat "$gh_out")" = 'matches=true' || fail 'classifier: CI_MATCH_GLOBS must mirror matches= to GITHUB_OUTPUT'
+test "$(classify_in CI_DEFAULT_BRANCH=main CI_MATCH_GLOBS='pkg/*' | wc -l | tr -d ' ')" = 1 || fail 'classifier: CI_MATCH_GLOBS mode must print exactly one line'
+# mktemp failure must still produce the mode-appropriate one-line fail-closed answer and exit 0
+fakebin="$tmp/fakebin"; mkdir -p "$fakebin"; printf '#!/bin/sh\nexit 1\n' > "$fakebin/mktemp"; chmod +x "$fakebin/mktemp"
+test "$(classify_in PATH="$fakebin:$PATH" CI_DEFAULT_BRANCH=main)" = 'docs_only=false' || fail 'classifier: mktemp failure must fail closed to docs_only=false'
+test "$(classify_in PATH="$fakebin:$PATH" CI_DEFAULT_BRANCH=main CI_MATCH_GLOBS='pkg/*')" = 'matches=true' || fail 'classifier: mktemp failure must fail closed to matches=true'
+(cd "$cls_repo" && PATH="$fakebin:$PATH" CI_DEFAULT_BRANCH=main "$classify" >/dev/null 2>&1) || fail 'classifier: must exit 0 when mktemp fails'
+# set-but-empty CI_MATCH_GLOBS is match mode with no globs: fail closed to matches=true (an undefined Taskfile var)
+test "$(classify_in CI_DEFAULT_BRANCH=main CI_MATCH_GLOBS='')" = 'matches=true' || fail 'classifier: empty CI_MATCH_GLOBS must fail closed to matches=true'
+: > "$gh_out"
+(cd "$cls_repo" && GITHUB_OUTPUT="$gh_out" CI_DEFAULT_BRANCH=main CI_MATCH_GLOBS='' "$classify" >/dev/null 2>&1)
+test "$(cat "$gh_out")" = 'matches=true' || fail 'classifier: empty CI_MATCH_GLOBS must mirror matches=true to GITHUB_OUTPUT'
 
 # no globbing against the working tree: without set -f, docs/* would pathname-expand to the
 # existing docs/nested directory and no longer match docs/nested/only.txt, yielding false
@@ -688,6 +726,19 @@ $task_out"
 $task_out"
   printf '%s\n' "$task_out" | rg -Fq "$check_marker" || fail "task ci: source diff must run check; got:
 $task_out"
+
+  # path-gated lane: a source change outside its globs reports not-applicable; a change inside runs the lane body
+  platform_marker="replace with the repository's platform-specific checks"
+  task_out="$(cd "$taskrun" && task ci-platform 2>&1)" || fail "task ci-platform: failed:
+$task_out"
+  printf '%s\n' "$task_out" | rg -Fq 'not applicable' || fail "task ci-platform: change outside its globs must report not applicable; got:
+$task_out"
+  mkdir -p "$taskrun/platform" && printf 'x\n' > "$taskrun/platform/windows.go"
+  git -C "$taskrun" add . && git -C "$taskrun" commit -qm platform
+  task_out="$(cd "$taskrun" && task ci-platform 2>&1)" || fail "task ci-platform: failed on a platform diff:
+$task_out"
+  printf '%s\n' "$task_out" | rg -Fq "$platform_marker" || fail "task ci-platform: platform diff must run the lane; got:
+$task_out"
 fi
 
 # --- docs
@@ -696,6 +747,12 @@ policy="$skill_root/references/ci-policy.md"
 rg -Fq 'types: [opened, synchronize, reopened, ready_for_review]' "$policy" || fail 'ci-policy.md: must state the trigger'
 rg -Fq 'ci-<lane>' "$policy" || fail 'ci-policy.md: must define ci-<lane> jobs'
 rg -Fq 'cross-runner artifact exchange' "$policy" || fail 'ci-policy.md: must define the needs: exception for cross-runner artifact exchange'
+rg -Fq 'CI_MATCH_GLOBS' "$policy" || fail 'ci-policy.md: must describe path-gated ci-<lane> targets via CI_MATCH_GLOBS'
+rg -Fq 'fold into `task check`' "$policy" || fail 'ci-policy.md: choice rule must include the fold-into-check branch'
+rg -Fq 'hosted runner' "$policy" || fail 'ci-policy.md: Runners section must carry the hosted-runner cost rule'
+rg -Fq 'path-gated' "$skill_root/SKILL.md" || fail 'SKILL.md: audit checklist must record path-gated lanes and hosted runners'
+rg -Fq 'glob variable' "$skill_root/references/migration.md" || fail 'migration.md: plan/apply must carry each gated lane glob variable'
+rg -Fq 'path-gated' "$skill_root/references/migration.md" || fail 'migration.md: must tell migrators to path-gate conditional lanes inside the Taskfile'
 if rg -qi 'never add `needs`' "$workflow_asset"; then fail 'ci.yml: header must not contradict the cross-runner exchange exception'; fi
 rg -Fq 'upload-artifact' "$skill_root/SKILL.md" || fail 'SKILL.md: Apply must authorize the artifact steps an exchange needs'
 if rg -q 'no job depends on another|`needs:` present' "$repo_root/docs/superpowers/specs/2026-08-18-simplify-ci-standard-design.md"; then fail 'spec: stale blanket needs: statements remain'; fi
