@@ -221,6 +221,9 @@ if test -z "$taskfile"; then
   deviate TASK-CI-MISSING 'Taskfile.yml: not found; the required workflow runs task ci -- add a Taskfile and copy task ci from the skill asset assets/Taskfile.ci.yml'
   deviate TASK-CHECK-MISSING 'Taskfile.yml: not found; task check is required'
   deviate TASK-DOCS-CHECK-MISSING 'Taskfile.yml: not found; task docs-check is required'
+  if test "${release_workflow_count:-0}" -gt 0; then
+    deviate TASK-RELEASE-GATE-MISSING 'Taskfile.yml: not found; task release-gate is required because a tag-push workflow exists'
+  fi
 else
   tasks_json="$(yq -o=json -I=0 '.tasks // {}' "$taskfile" 2>/dev/null)" || tasks_json=''
   case "$tasks_json" in '{'*) ;; *) tasks_json='{}' ;; esac

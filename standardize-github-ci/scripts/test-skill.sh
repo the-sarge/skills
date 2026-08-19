@@ -414,6 +414,14 @@ yq -i 'del(.tasks["release-gate"])' "$rel/Taskfile.yml"
 git -C "$rel" commit -qam no-gate-task
 run_audit "$rel"; out="$audit_out"
 expect_deviation "$out" TASK-RELEASE-GATE-MISSING
+# no Taskfile at all, but a tag-push workflow: the release-specific diagnostic must still appear
+norel_tf="$tmp/release-notaskfile"
+make_conformant_repo "$norel_tf"
+cp "$rel/.github/workflows/release.yml" "$norel_tf/.github/workflows/release.yml"
+git -C "$norel_tf" rm -q Taskfile.yml && git -C "$norel_tf" add . && git -C "$norel_tf" commit -qm notaskfile
+run_audit "$norel_tf"; out="$audit_out"
+test "$audit_rc" -eq 3 || fail 'audit: tag-push workflow with no Taskfile must exit 3'
+expect_deviation "$out" TASK-RELEASE-GATE-MISSING
 # a repo with no tag-push workflow does not need release-gate
 norel="$tmp/norelease"
 make_conformant_repo "$norel"
@@ -676,7 +684,8 @@ rg -Fq 'for every caller found in §1.5, the purpose-named target it will call' 
 rg -Fq 'Define the purpose-named targets planned in §2' "$migration" || fail 'migration.md §3: apply must define the targets and repoint callers'
 rg -Fq 'never `task ci` or `task ci-<lane>`' "$policy" || fail 'ci-policy.md: non-required workflows must call purpose-named targets, never task ci or ci-<lane>'
 rg -Fq '`task release-gate`' "$policy" || fail 'ci-policy.md: tag-push release workflows must run task release-gate'
-rg -Fq 'release-gate' "$migration" || fail 'migration.md: must name release-gate for release workflows'
+rg -Fq 'Every tag-push release workflow calls `task release-gate`' "$migration" || fail 'migration.md: must mandate task release-gate for tag-push workflows'
+rg -Fq 'tag-push release workflows run `task release-gate`' "$skill_root/SKILL.md" || fail 'SKILL.md: audit guidance must name task release-gate'
 rg -Fq 'never `task ci` or `task ci-<lane>`' "$skill_root/SKILL.md" || fail 'SKILL.md: audit summary must cover both task ci and task ci-<lane>'
 rg -Fq 'gh pr merge --squash --match-head-commit' "$migration" || fail 'migration.md: must describe the exact-head squash merge'
 rg -Fq 'assets/ruleset.json' "$migration" || fail 'migration.md: must apply the ruleset asset'
