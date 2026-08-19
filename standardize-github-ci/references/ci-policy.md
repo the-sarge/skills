@@ -74,7 +74,7 @@ Apply [`assets/ruleset.json`](../assets/ruleset.json) to every repository's defa
 
 ## Non-required workflows
 
-Deep tests, fuzzing, security scans, cross-platform builds, and release publication keep their own workflows and names. They may use `schedule`, `push: tags`, or `workflow_dispatch`. They may not use `pull_request` or `pull_request_target`, and they are never required checks. Every job in them still sets `timeout-minutes` and pins actions.
+Deep tests, fuzzing, security scans, cross-platform builds, and release publication keep their own workflows and names. They may use `schedule`, `push: tags`, or `workflow_dispatch`. They may not use `pull_request` or `pull_request_target`, and they are never required checks. Every job in them still sets `timeout-minutes` and pins actions. They call purpose-named Taskfile targets (`release-gate`, `nightly`, …), never `task ci` or `task ci-<lane>`: those are the PR merge gate — deliberately the fast path, classified against a PR merge base that does not exist on a tag or schedule — so a release workflow that calls `task ci` validates less than it appears to.
 
 ## Runners
 
