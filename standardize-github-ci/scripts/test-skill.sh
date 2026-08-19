@@ -239,6 +239,7 @@ mutate CI-AGGREGATE "$exchange_lane"' | .jobs["ci-race"].steps[-1].if = "needs.c
 mutate CI-AGGREGATE "$exchange_lane"' | .jobs["ci-race"].env.UP = "${{ needs['"'"'ci-required'"'"']['"'"'result'"'"'] }}"'
 mutate CI-AGGREGATE "$exchange_lane"' | .jobs["ci-race"].env.UP = "${{\n  needs.ci-required.result\n}}"'
 mutate CI-AGGREGATE "$exchange_lane"' | .jobs["ci-race"].env.UP = "${{ fromJSON(toJSON(needs)).ci-required.conclusion }}"'
+mutate CI-AGGREGATE "$exchange_lane"' | .jobs["ci-race"].env.ALL_OUTPUTS = "${{ toJSON(needs.ci-required.outputs) }}"'
 # inert text and dependency outputs are not aggregation
 inert="$tmp/inert"
 make_conformant_repo "$inert"

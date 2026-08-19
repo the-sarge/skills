@@ -118,14 +118,14 @@ else
       fi
     fi
     # Aggregation: fail closed on any use of the needs context inside an expression other than an outputs access
-    # (needs.<job>.outputs.<name> or bracket equivalents). Expression text is every ${{ }} fragment anywhere in the
+    # (needs.<job>.outputs.<name> or bracket equivalents; a bare .outputs object is not a named output and is rejected). Expression text is every ${{ }} fragment anywhere in the
     # job (spanning lines via [\s\S]) plus the job-level and step-level `if` values, which GitHub evaluates as expressions even
     # without delimiters. This catches .result, .conclusion, wildcard, bracket, toJSON(needs), and future spellings.
     if printf '%s' "$jobjson" | jq -e '
         ([.. | strings | scan("\\$\\{\\{[\\s\\S]*?\\}\\}")]
          + [(.if // "" | tostring)]
          + [((.steps? // []) | if type=="array" then .[] else empty end | if type=="object" then (.if // "" | tostring) else "" end)])
-        | map(gsub("needs[[:space:]]*(\\.[[:space:]]*[A-Za-z0-9_-]+|\\[[[:space:]]*(\"[^\"]*\"|\u0027[^\u0027]*\u0027)[[:space:]]*\\])[[:space:]]*(\\.[[:space:]]*outputs\\b|\\[[[:space:]]*(\"outputs\"|\u0027outputs\u0027)[[:space:]]*\\])"; ""; "i"))
+        | map(gsub("needs[[:space:]]*(\\.[[:space:]]*[A-Za-z0-9_-]+|\\[[[:space:]]*(\"[^\"]*\"|\u0027[^\u0027]*\u0027)[[:space:]]*\\])[[:space:]]*(\\.[[:space:]]*outputs|\\[[[:space:]]*(\"outputs\"|\u0027outputs\u0027)[[:space:]]*\\])[[:space:]]*(\\.[[:space:]]*[A-Za-z0-9_-]+|\\[[[:space:]]*(\"[^\"]*\"|\u0027[^\u0027]*\u0027)[[:space:]]*\\])"; ""; "i"))
         | any(test("\\bneeds\\b"; "i"))' >/dev/null 2>&1; then
       deviate CI-AGGREGATE "ci.yml: job $job uses the needs context for something other than needs.<job>.outputs.<name> (for example .result, .conclusion, needs.*, or toJSON(needs)); jobs must not aggregate other jobs — each ci-* job is required on its own"
     fi
