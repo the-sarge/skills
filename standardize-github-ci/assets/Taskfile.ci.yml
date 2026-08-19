@@ -39,6 +39,12 @@ tasks:
     cmds:
       - echo "replace with the repository's format, vet, lint, test, and build checks"
 
+  release-gate:
+    desc: Release gate run by the tag-push release workflow (repository-owned; delete if the repository publishes no releases)
+    cmds:
+      - task: check
+      - echo "replace with the repository's deep checks (race, vulnerability scan, SAST); keep bounded fuzzing on the nightly if it is slow or flaky"
+
   race:
     desc: Race lane body (repository-owned; only if ci-race is used)
     cmds:

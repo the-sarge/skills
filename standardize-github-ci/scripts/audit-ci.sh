@@ -160,6 +160,7 @@ fi
 # document is reported and skipped rather than aborting the run.
 printf '## Other workflows\n\n'
 other_count=0
+release_workflow_count=0
 if test -d "$workflow_dir"; then
   while IFS= read -r wf_path; do
     test -n "$wf_path" || continue
@@ -185,6 +186,14 @@ if test -d "$workflow_dir"; then
     ci_calls="$(printf '%s' "$ojobs" | jq -r '[.[] | (if type=="object" then (.steps? // []) else [] end) | (if type=="array" then . else [] end) | .[] | select(type=="object" and has("run")) | (.run|tostring) | scan("(?:^|[[:space:]&|;(<>`])task[[:space:]]+(ci(?:-[A-Za-z0-9_-]+)?)(?=$|[[:space:]&|;)<>`])") | .[0]] | unique | .[]' 2>/dev/null || true)"
     if test -n "$ci_calls"; then
       deviate WF-TASK-CI "$rel: runs $(printf '%s\n' "$ci_calls" | sed 's/.*/`task &`/' | paste -sd, - | sed 's/,/, /g'); ci and ci-<lane> are the PR merge gate (fast path, classified against a PR merge base) — call a purpose-named Taskfile target such as release-gate or nightly instead"
+    fi
+    # A tag-push (release) workflow must run `task release-gate`, the repository-owned release gate, so the
+    # validation that precedes an immutable release is named, visible, and never silently the fast PR gate.
+    if printf '%s' "$owf" | jq -e '.on | type=="object" and (.push | type=="object") and (.push | has("tags"))' >/dev/null 2>&1; then
+      release_workflow_count=$((release_workflow_count + 1))
+      if ! printf '%s' "$ojobs" | jq -e '[.[] | (if type=="object" then (.steps? // []) else [] end) | (if type=="array" then . else [] end) | .[] | select(type=="object" and has("run")) | (.run|tostring)] | any(test("(?:^|[[:space:]&|;(<>`])task[[:space:]]+release-gate(?:$|[[:space:]&|;)<>`])"))' >/dev/null 2>&1; then
+        deviate WF-RELEASE-GATE "$rel: tag-push workflow does not run task release-gate; every release workflow runs the repository's release gate before publishing"
+      fi
     fi
     missing_timeouts="$(printf '%s' "$ojobs" | jq -r '[to_entries[] | select((.value | if type=="object" then .["timeout-minutes"] else null end) == null) | .key] | join(", ")' 2>/dev/null)" || missing_timeouts=''
     if test -n "$missing_timeouts"; then
@@ -212,6 +221,9 @@ if test -z "$taskfile"; then
   deviate TASK-CI-MISSING 'Taskfile.yml: not found; the required workflow runs task ci -- add a Taskfile and copy task ci from the skill asset assets/Taskfile.ci.yml'
   deviate TASK-CHECK-MISSING 'Taskfile.yml: not found; task check is required'
   deviate TASK-DOCS-CHECK-MISSING 'Taskfile.yml: not found; task docs-check is required'
+  if test "${release_workflow_count:-0}" -gt 0; then
+    deviate TASK-RELEASE-GATE-MISSING 'Taskfile.yml: not found; task release-gate is required because a tag-push workflow exists'
+  fi
 else
   tasks_json="$(yq -o=json -I=0 '.tasks // {}' "$taskfile" 2>/dev/null)" || tasks_json=''
   case "$tasks_json" in '{'*) ;; *) tasks_json='{}' ;; esac
@@ -222,6 +234,9 @@ else
   has_task ci || deviate TASK-CI-MISSING "$(basename "$taskfile"): task ci is required; copy it from the skill asset assets/Taskfile.ci.yml"
   has_task check || deviate TASK-CHECK-MISSING "$(basename "$taskfile"): task check is required"
   has_task docs-check || deviate TASK-DOCS-CHECK-MISSING "$(basename "$taskfile"): task docs-check is required"
+  if test "${release_workflow_count:-0}" -gt 0; then
+    if has_task release-gate; then printf -- '- `release-gate`: present\n'; else printf -- '- `release-gate`: missing\n'; deviate TASK-RELEASE-GATE-MISSING "$(basename "$taskfile"): task release-gate is required because a tag-push workflow exists; copy it from assets/Taskfile.ci.yml and fill in the repository's deep checks"; fi
+  fi
   while IFS= read -r job; do
     test -n "$job" || continue
     case "$job" in
