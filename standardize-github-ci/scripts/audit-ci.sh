@@ -97,7 +97,9 @@ else
       || deviate CI-TIMEOUT "ci.yml: job $job must set timeout-minutes"
     # needs: is permitted only for a cross-runner artifact exchange: the job is a destination ci-<lane> (never
     # ci-required), every target is a different ci-* job in this workflow (hence itself a required check), and the
-    # job must not run when an upstream failed. GitHub expression functions are case-insensitive and allow spaces.
+    # job must keep GitHub's implicit success gate: no status function at all (always/failure/cancelled would run after
+    # an upstream failure; !success() or success() == false would skip after a green upstream, and a skipped required
+    # check counts as passing). GitHub expression functions are case-insensitive and allow spaces.
     if jj 'has("needs")'; then
       needs_list="$(printf '%s' "$jobjson" | jq -r '.needs | if type=="array" then .[] elif type=="string" then . else empty end' 2>/dev/null || true)"
       needs_ok=true
@@ -110,11 +112,11 @@ else
           *) needs_ok=false ;;
         esac
       done <<< "$needs_list"
-      if jj '(.if // "" | tostring) | test("(always|failure|cancelled)[[:space:]]*\\("; "i")'; then needs_ok=false; fi
+      if jj '(.if // "" | tostring) | test("(always|failure|cancelled|success)[[:space:]]*\\("; "i")'; then needs_ok=false; fi
       if test "$needs_ok" = true; then
         needs_edges="${needs_edges:+$needs_edges; }\`$job\` needs $(printf '%s\n' "$needs_list" | sed 's/.*/`&`/' | paste -sd, - | sed 's/,/, /g')"
       else
-        deviate CI-NEEDS "ci.yml: job $job may declare needs only as the destination ci-<lane> of a cross-runner artifact exchange: every target must be a different ci-* job in ci.yml, ci-required never depends on other jobs, and the job must not use always(), failure(), or cancelled()"
+        deviate CI-NEEDS "ci.yml: job $job may declare needs only as the destination ci-<lane> of a cross-runner artifact exchange: every target must be a different ci-* job in ci.yml, ci-required never depends on other jobs, and the job's if must not call any status function (always(), failure(), cancelled(), success())"
       fi
     fi
     # Aggregation: fail closed on any use of the needs context inside an expression other than an outputs access
