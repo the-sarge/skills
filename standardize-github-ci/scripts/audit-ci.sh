@@ -117,15 +117,17 @@ else
         deviate CI-NEEDS "ci.yml: job $job may declare needs only as the destination ci-<lane> of a cross-runner artifact exchange: every target must be a different ci-* job in ci.yml, ci-required never depends on other jobs, and the job must not use always(), failure(), or cancelled()"
       fi
     fi
-    # Aggregation: any GitHub expression that reads dependency results (dotted, wildcard, bracketed, or the whole
-    # needs context). Expression text is every ${{ }} fragment anywhere in the job plus the job-level and step-level
-    # `if` values, which GitHub evaluates as expressions even without delimiters. needs.<job>.outputs.<name> stays allowed.
+    # Aggregation: fail closed on any use of the needs context inside an expression other than an outputs access
+    # (needs.<job>.outputs.<name> or bracket equivalents). Expression text is every ${{ }} fragment anywhere in the
+    # job (spanning lines via [\s\S]) plus the job-level and step-level `if` values, which GitHub evaluates as expressions even
+    # without delimiters. This catches .result, .conclusion, wildcard, bracket, toJSON(needs), and future spellings.
     if printf '%s' "$jobjson" | jq -e '
-        ([.. | strings | scan("\\$\\{\\{.*?\\}\\}")]
+        ([.. | strings | scan("\\$\\{\\{[\\s\\S]*?\\}\\}")]
          + [(.if // "" | tostring)]
          + [((.steps? // []) | if type=="array" then .[] else empty end | if type=="object" then (.if // "" | tostring) else "" end)])
-        | any(test("needs[[:space:]]*(\\.[[:space:]]*([A-Za-z0-9_-]+|\\*)|\\[[^]]*\\])[[:space:]]*\\.[[:space:]]*result|tojson[[:space:]]*\\([[:space:]]*needs[[:space:]]*\\)"; "i"))' >/dev/null 2>&1; then
-      deviate CI-AGGREGATE "ci.yml: job $job reads dependency results (needs.<job>.result, needs.*.result, or toJSON(needs)); jobs must not aggregate other jobs — each ci-* job is required on its own"
+        | map(gsub("needs[[:space:]]*(\\.[[:space:]]*[A-Za-z0-9_-]+|\\[[[:space:]]*(\"[^\"]*\"|\u0027[^\u0027]*\u0027)[[:space:]]*\\])[[:space:]]*(\\.[[:space:]]*outputs\\b|\\[[[:space:]]*(\"outputs\"|\u0027outputs\u0027)[[:space:]]*\\])"; ""; "i"))
+        | any(test("\\bneeds\\b"; "i"))' >/dev/null 2>&1; then
+      deviate CI-AGGREGATE "ci.yml: job $job uses the needs context for something other than needs.<job>.outputs.<name> (for example .result, .conclusion, needs.*, or toJSON(needs)); jobs must not aggregate other jobs — each ci-* job is required on its own"
     fi
     jj '(has("strategy")|not) or ((.strategy|type=="object") and (.strategy.matrix == null))' \
       || deviate CI-MATRIX "ci.yml: job $job must not use a matrix; route by job, not by matrix"

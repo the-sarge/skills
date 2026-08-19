@@ -236,10 +236,13 @@ mutate CI-AGGREGATE "$exchange_lane"' | .jobs["ci-race"].env.ALL = "${{ toJSON(n
 # job-level and step-level if are expressions even without ${{ }} delimiters
 mutate CI-AGGREGATE "$exchange_lane"' | .jobs["ci-race"].if = "!github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository && needs.ci-required.result == '"'"'success'"'"'"'
 mutate CI-AGGREGATE "$exchange_lane"' | .jobs["ci-race"].steps[-1].if = "needs.ci-required.result == '"'"'success'"'"'"'
+mutate CI-AGGREGATE "$exchange_lane"' | .jobs["ci-race"].env.UP = "${{ needs['"'"'ci-required'"'"']['"'"'result'"'"'] }}"'
+mutate CI-AGGREGATE "$exchange_lane"' | .jobs["ci-race"].env.UP = "${{\n  needs.ci-required.result\n}}"'
+mutate CI-AGGREGATE "$exchange_lane"' | .jobs["ci-race"].env.UP = "${{ fromJSON(toJSON(needs)).ci-required.conclusion }}"'
 # inert text and dependency outputs are not aggregation
 inert="$tmp/inert"
 make_conformant_repo "$inert"
-yq -i "$exchange_lane"' | .jobs["ci-race"].env.NOTE = "plain text mentioning needs.ci-required.result is not an expression" | .jobs["ci-race"].env.BUNDLE = "${{ needs.ci-required.outputs.bundle_name }}"' "$inert/.github/workflows/ci.yml"
+yq -i "$exchange_lane"' | .jobs["ci-race"].env.NOTE = "plain text mentioning needs.ci-required.result is not an expression" | .jobs["ci-race"].env.BUNDLE = "${{ needs.ci-required.outputs.bundle_name }}" | .jobs["ci-race"].env.BUNDLE2 = "${{ needs['"'"'ci-required'"'"'].outputs['"'"'bundle_name'"'"'] }}"' "$inert/.github/workflows/ci.yml"
 git -C "$inert" commit -qam inert
 run_audit "$inert"; out="$audit_out"
 test "$audit_rc" -eq 0 || fail "audit: inert text and needs.<job>.outputs must not be aggregation:
