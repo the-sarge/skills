@@ -327,6 +327,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: task race
+  # a reusable-workflow call cannot carry timeout-minutes; the called workflow owns its timeouts
+  windows_contracts:
+    uses: ./.github/workflows/windows-contracts.yml
+    with:
+      lane: portable
 YAML
 git -C "$other" add . && git -C "$other" commit -qm deep
 run_audit "$other"; out="$audit_out"

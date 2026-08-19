@@ -195,7 +195,8 @@ if test -d "$workflow_dir"; then
         deviate WF-RELEASE-GATE "$rel: tag-push workflow does not run task release-gate; every release workflow runs the repository's release gate before publishing"
       fi
     fi
-    missing_timeouts="$(printf '%s' "$ojobs" | jq -r '[to_entries[] | select((.value | if type=="object" then .["timeout-minutes"] else null end) == null) | .key] | join(", ")' 2>/dev/null)" || missing_timeouts=''
+    # A job that calls a reusable workflow (`uses:` at job level) cannot carry timeout-minutes; the called workflow owns them.
+    missing_timeouts="$(printf '%s' "$ojobs" | jq -r '[to_entries[] | select(.value | (type!="object") or ((has("uses")|not) and .["timeout-minutes"] == null)) | .key] | join(", ")' 2>/dev/null)" || missing_timeouts=''
     if test -n "$missing_timeouts"; then
       deviate WF-TIMEOUT "$rel: jobs missing timeout-minutes: $missing_timeouts"
     fi
