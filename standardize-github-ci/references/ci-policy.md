@@ -58,6 +58,7 @@ Copy [`assets/Taskfile.ci.yml`](../assets/Taskfile.ci.yml) into the repository `
 - `docs-check`: repository-owned documentation checks.
 - `check`: repository-owned ordinary merge gate (format, vet, lint, unit tests, build smoke).
 - `ci-<lane>`: runs the classifier, exits successfully with a message on docs-only changes, otherwise runs the lane.
+- `release-gate` (when the repository publishes releases): the validation a tag-push release workflow runs before publishing; repository-owned, typically `check` plus the deep checks the PR gate deliberately skips.
 - `CI_DOCS_GLOBS` (Taskfile var): space-separated shell globs treated as documentation. Default `*.md docs/* DEV-JOURNAL.md LICENSE LICENSE.*`. Extend it per repository rather than editing the script.
 
 `task ci` behaves identically on a laptop and in CI, so a wrong classification is reproducible locally without pushing.
@@ -74,7 +75,7 @@ Apply [`assets/ruleset.json`](../assets/ruleset.json) to every repository's defa
 
 ## Non-required workflows
 
-Deep tests, fuzzing, security scans, cross-platform builds, and release publication keep their own workflows and names. They may use `schedule`, `push: tags`, or `workflow_dispatch`. They may not use `pull_request` or `pull_request_target`, and they are never required checks. Every job in them still sets `timeout-minutes` and pins actions. They call purpose-named Taskfile targets (`release-gate`, `nightly`, …), never `task ci` or `task ci-<lane>`: those are the PR merge gate — deliberately the fast path, classified against a PR merge base that does not exist on a tag or schedule — so a release workflow that calls `task ci` validates less than it appears to.
+Deep tests, fuzzing, security scans, cross-platform builds, and release publication keep their own workflows and names. They may use `schedule`, `push: tags`, or `workflow_dispatch`. They may not use `pull_request` or `pull_request_target`, and they are never required checks. Every job in them still sets `timeout-minutes` and pins actions. They call purpose-named Taskfile targets, never `task ci` or `task ci-<lane>`. The names are fixed where it matters: every tag-push release workflow runs `task release-gate` (repository-owned; recommended `check` + deep checks such as race, vulnerability scan, and SAST, with bounded fuzzing left to the nightly when it is slow or flaky) before publishing, and the audit reports `WF-RELEASE-GATE` / `TASK-RELEASE-GATE-MISSING` when it does not; scheduled workflows should use `nightly` (or a descriptive name when a repository has several). Never `task ci`: those are the PR merge gate — deliberately the fast path, classified against a PR merge base that does not exist on a tag or schedule — so a release workflow that calls `task ci` validates less than it appears to.
 
 ## Runners
 

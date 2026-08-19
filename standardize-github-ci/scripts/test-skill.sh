@@ -74,7 +74,7 @@ fi
 
 test -f "$taskfile_asset" || fail "missing $taskfile_asset"
 yq eval '.' "$taskfile_asset" >/dev/null
-for t in ci ci-race docs-check check; do
+for t in ci ci-race docs-check check release-gate; do
   test "$(yq -r ".tasks | has(\"$t\")" "$taskfile_asset")" = true || fail "Taskfile.ci.yml: missing task $t"
 done
 rg -Fq 'scripts/ci-classify.sh' "$taskfile_asset" || fail 'Taskfile.ci.yml: ci must call scripts/ci-classify.sh'
@@ -403,6 +403,25 @@ git -C "$rel" commit -qam release-gate
 run_audit "$rel"; out="$audit_out"
 test "$audit_rc" -eq 0 || fail "audit: non-required workflow calling a purpose-named target must be conformant:
 $out"
+# a tag-push workflow must run task release-gate, and the Taskfile must define it
+yq -i '.jobs.publish.steps[1].run = "task build" | .jobs.publish.steps[3].run = "task package>/dev/null"' "$rel/.github/workflows/release.yml"
+git -C "$rel" commit -qam no-gate
+run_audit "$rel"; out="$audit_out"
+test "$audit_rc" -eq 3 || fail 'audit: tag-push workflow without task release-gate must exit 3'
+expect_deviation "$out" WF-RELEASE-GATE
+yq -i '.jobs.publish.steps[1].run = "task release-gate"' "$rel/.github/workflows/release.yml"
+yq -i 'del(.tasks["release-gate"])' "$rel/Taskfile.yml"
+git -C "$rel" commit -qam no-gate-task
+run_audit "$rel"; out="$audit_out"
+expect_deviation "$out" TASK-RELEASE-GATE-MISSING
+# a repo with no tag-push workflow does not need release-gate
+norel="$tmp/norelease"
+make_conformant_repo "$norel"
+yq -i 'del(.tasks["release-gate"])' "$norel/Taskfile.yml"
+git -C "$norel" commit -qam norel
+run_audit "$norel"; out="$audit_out"
+test "$audit_rc" -eq 0 || fail "audit: release-gate is only required when a tag-push workflow exists:
+$out"
 
 # local composite actions and docker:// images carry no ref to pin and must not be flagged
 localact="$tmp/localaction"
@@ -656,6 +675,8 @@ rg -Fq 'every caller' "$migration" || fail 'migration.md: must require an invent
 rg -Fq 'for every caller found in §1.5, the purpose-named target it will call' "$migration" || fail 'migration.md §2: plan must map each caller to its purpose-named target'
 rg -Fq 'Define the purpose-named targets planned in §2' "$migration" || fail 'migration.md §3: apply must define the targets and repoint callers'
 rg -Fq 'never `task ci` or `task ci-<lane>`' "$policy" || fail 'ci-policy.md: non-required workflows must call purpose-named targets, never task ci or ci-<lane>'
+rg -Fq '`task release-gate`' "$policy" || fail 'ci-policy.md: tag-push release workflows must run task release-gate'
+rg -Fq 'release-gate' "$migration" || fail 'migration.md: must name release-gate for release workflows'
 rg -Fq 'never `task ci` or `task ci-<lane>`' "$skill_root/SKILL.md" || fail 'SKILL.md: audit summary must cover both task ci and task ci-<lane>'
 rg -Fq 'gh pr merge --squash --match-head-commit' "$migration" || fail 'migration.md: must describe the exact-head squash merge'
 rg -Fq 'assets/ruleset.json' "$migration" || fail 'migration.md: must apply the ruleset asset'
