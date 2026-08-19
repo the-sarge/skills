@@ -110,3 +110,33 @@ The CI standard's blanket `needs:` ban was narrowed to the hazard it guarded aga
 ### Next
 
 - Sync the changed skill into dotfiles; then migrate repositories starting with codemux, and wellspring last using the exchange exception for its portability lanes. Live view: [issue #8](https://github.com/the-sarge/skills/issues/8).
+
+---
+
+## Audit flags non-required workflows that run task ci - 2026-08-19 11:31 EDT
+
+**Main:** `1b8774eb8613`
+**Actor:** Claude
+
+### Summary
+
+`standardize-github-ci` now catches the gap ai-cli hit after its migration ([ai-cli #818](https://github.com/the-sarge/ai-cli/issues/818)): once `task ci` means "fast PR merge gate", any other caller — notably `release.yml` — silently validates less than before. Landed on `main` as squash commit `1b8774e` from [PR #13](https://github.com/the-sarge/skills/pull/13).
+
+### Completed
+
+- `scripts/audit-ci.sh`: new `WF-TASK-CI` deviation when a non-required workflow's run steps invoke `task ci` or `task ci-<lane>` (word-boundary scan that also covers redirects, backticks, and multi-line scripts); the message names the targets found and points at purpose-named targets such as `release-gate` or `nightly`.
+- `references/migration.md`: §1.5 inventories every caller of a Taskfile target the migration renames or redefines; §2 maps each caller to its purpose-named target and body; §3.5 defines those targets and repoints the callers. `references/ci-policy.md` (non-required workflows) and `SKILL.md` (audit summary) state the same rule.
+- `scripts/test-skill.sh`: release-workflow fixture (`task ci`, `task ci-race`, `task ci>/dev/null`, backticked `task ci-portable-linux`, plus `task cicd`/`task ci_fast`/`task ci-` negatives) → `WF-TASK-CI`; repointed to `release-gate`/`nightly` → conformant; section-specific prose greps for policy, SKILL.md, migration §2 and §3.
+
+### Decisions
+
+- `ci` and `ci-<lane>` are PR-only targets by definition (classified against a PR merge base that does not exist on a tag or schedule). Release and scheduled workflows get purpose-named targets; the recommended release composition is `check` + `deep-check` + `sast`, with bounded fuzzing left to the nightly when it would make releases slow or flaky. Recorded in PR #13 and ai-cli #818.
+
+### Validation
+
+- RAS review run `20260819T150901` (7 findings: 4 fix-now, 3 rejected as unsupported/duplicate); verification at `735da62` cleared all clusters with one low coverage nit fixed in `5f8a00d` without another RAS cycle (docs/test-only policy).
+- `standardize-github-ci/scripts/test-skill.sh` printed `skill fixtures passed` under default bash and `/bin/bash` 3.2; shellcheck and actionlint clean.
+
+### Next
+
+- Sync the skill into dotfiles; apply the caller inventory when migrating codemux → tapmux → wiremux → gridcast → wellspring. Live view: [issue #8](https://github.com/the-sarge/skills/issues/8).
