@@ -140,3 +140,34 @@ The CI standard's blanket `needs:` ban was narrowed to the hazard it guarded aga
 ### Next
 
 - Sync the skill into dotfiles; apply the caller inventory when migrating codemux → tapmux → wiremux → gridcast → wellspring. Live view: [issue #8](https://github.com/the-sarge/skills/issues/8).
+
+---
+
+## Release gate named: task release-gate - 2026-08-19 12:24 EDT
+
+**Main:** `7ec1da262bdc`
+**Actor:** Claude
+
+### Summary
+
+The release gate now has a fixed name: every tag-push release workflow runs `task release-gate`. Landed on `main` as squash commit `7ec1da2` from [PR #15](https://github.com/the-sarge/skills/pull/15), completing the caller-inventory change from PR #13 so `release.yml` reads the same in every repository.
+
+### Completed
+
+- `references/ci-policy.md` and `references/migration.md`: tag-push release workflows run `task release-gate` (repository-owned; recommended `check` plus the deep checks the PR gate skips — race, vulnerability scan, SAST — with bounded fuzzing left to the nightly when slow or flaky); scheduled workflows use `nightly` or a descriptive name (not mandated, since several per repository is normal). `SKILL.md` audit guidance names the target.
+- `assets/Taskfile.ci.yml`: `release-gate` task placeholder (`check` + deep-check placeholder).
+- `scripts/audit-ci.sh`: `WF-RELEASE-GATE` when a `push: tags` workflow has no run step invoking `task release-gate`; `TASK-RELEASE-GATE-MISSING` when such a workflow exists and the Taskfile lacks the target or is absent. Repositories without a tag-push workflow are unaffected.
+- `scripts/test-skill.sh`: fixtures for all three cases plus the no-release control; discriminating policy/migration/SKILL.md greps (proved not to match the base document).
+
+### Decisions
+
+- Tag-push detection is the canonical subset `.on.push.tags`; `tags-ignore`-only and `on: release` triggers are a separate, deliberate expansion if a repository turns out to use them (RAS review C-001/C-008, rejected as out of the declared domain, recorded here as a follow-up).
+
+### Validation
+
+- RAS review run `20260819T155818` (8 findings: 3 fix-now, 5 rejected as duplicate/out-of-domain); verification at `21e6d7f` cleared all clusters with no new concerns.
+- `standardize-github-ci/scripts/test-skill.sh` printed `skill fixtures passed` under default bash and `/bin/bash` 3.2; shellcheck, actionlint, and `yq` clean; `task release-gate` runs from the asset.
+
+### Next
+
+- Sync the skill into dotfiles; migrate codemux → tapmux → wiremux → gridcast → wellspring, defining `release-gate` wherever a tag-push workflow exists. Live view: [issue #8](https://github.com/the-sarge/skills/issues/8).
