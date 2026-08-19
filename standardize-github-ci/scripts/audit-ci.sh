@@ -95,28 +95,32 @@ else
       || deviate CI-GUARD "ci.yml: job $job must guard with !github.event.pull_request.draft && head.repo.full_name == github.repository"
     jj '.["timeout-minutes"]|type=="number"' \
       || deviate CI-TIMEOUT "ci.yml: job $job must set timeout-minutes"
-    # needs: is permitted only for a cross-runner artifact exchange: every target must be a ci-* job in this
-    # workflow (hence itself a required check), and the job must not run when an upstream failed.
+    # needs: is permitted only for a cross-runner artifact exchange: the job is a destination ci-<lane> (never
+    # ci-required), every target is a different ci-* job in this workflow (hence itself a required check), and the
+    # job must not run when an upstream failed. GitHub expression functions are case-insensitive and allow spaces.
     if jj 'has("needs")'; then
       needs_list="$(printf '%s' "$jobjson" | jq -r '.needs | if type=="array" then .[] elif type=="string" then . else empty end' 2>/dev/null || true)"
       needs_ok=true
-      if test -z "$needs_list"; then needs_ok=false; fi
+      test -n "$needs_list" || needs_ok=false
+      test "$job" != ci-required || needs_ok=false
       while IFS= read -r dep; do
         test -n "$dep" || continue
         case "$dep" in
-          ci-*) printf '%s\n' "$job_names" | grep -qx -- "$dep" || needs_ok=false ;;
+          ci-*) { test "$dep" != "$job" && printf '%s\n' "$job_names" | grep -qxF -- "$dep"; } || needs_ok=false ;;
           *) needs_ok=false ;;
         esac
       done <<< "$needs_list"
-      if jj '(.if // "") | test("always\\(\\)|failure\\(\\)|cancelled\\(\\)")'; then needs_ok=false; fi
+      if jj '(.if // "" | tostring) | test("(always|failure|cancelled)[[:space:]]*\\("; "i")'; then needs_ok=false; fi
       if test "$needs_ok" = true; then
         needs_edges="${needs_edges:+$needs_edges; }\`$job\` needs $(printf '%s\n' "$needs_list" | sed 's/.*/`&`/' | paste -sd, - | sed 's/,/, /g')"
       else
-        deviate CI-NEEDS "ci.yml: job $job may declare needs only for a cross-runner artifact exchange: every target must be a ci-* job in ci.yml and the job must not use always(), failure(), or cancelled()"
+        deviate CI-NEEDS "ci.yml: job $job may declare needs only as the destination ci-<lane> of a cross-runner artifact exchange: every target must be a different ci-* job in ci.yml, ci-required never depends on other jobs, and the job must not use always(), failure(), or cancelled()"
       fi
     fi
-    if jj 'tostring | test("needs\\.[A-Za-z0-9_-]+\\.result")'; then
-      deviate CI-AGGREGATE "ci.yml: job $job inspects needs.<job>.result; jobs must not aggregate or summarize other jobs — each ci-* job is required on its own"
+    # Aggregation: any GitHub expression that reads dependency results (dotted, wildcard, bracketed, or the whole
+    # needs context). Only text inside ${{ }} counts; needs.<job>.outputs.<name> stays allowed.
+    if printf '%s' "$jobjson" | jq -e '[.. | strings | scan("\\$\\{\\{.*?\\}\\}")] | any(test("needs[[:space:]]*(\\.[[:space:]]*([A-Za-z0-9_-]+|\\*)|\\[[^]]*\\])[[:space:]]*\\.[[:space:]]*result|tojson[[:space:]]*\\([[:space:]]*needs[[:space:]]*\\)"; "i"))' >/dev/null 2>&1; then
+      deviate CI-AGGREGATE "ci.yml: job $job reads dependency results (needs.<job>.result, needs.*.result, or toJSON(needs)); jobs must not aggregate other jobs — each ci-* job is required on its own"
     fi
     jj '(has("strategy")|not) or ((.strategy|type=="object") and (.strategy.matrix == null))' \
       || deviate CI-MATRIX "ci.yml: job $job must not use a matrix; route by job, not by matrix"

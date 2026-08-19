@@ -223,7 +223,24 @@ mutate CI-NEEDS '.jobs.build = .jobs["ci-required"] | .jobs.build.steps[-1].run 
 mutate CI-NEEDS '.jobs["ci-required"].needs = ["ci-missing"]'
 mutate CI-NEEDS '.jobs["ci-race"] = .jobs["ci-required"] | .jobs["ci-race"].steps[-1].run = "task ci-race" | .jobs["ci-race"].needs = ["ci-required"] | .jobs["ci-race"].if = "${{ always() && !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}"'
 mutate CI-NEEDS '.jobs["ci-race"] = .jobs["ci-required"] | .jobs["ci-race"].steps[-1].run = "task ci-race" | .jobs["ci-race"].needs = "ci-required" | .jobs["ci-race"].if = "${{ failure() || (!github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository) }}"'
-mutate CI-AGGREGATE '.jobs["ci-race"] = .jobs["ci-required"] | .jobs["ci-race"].steps[-1].run = "task ci-race" | .jobs["ci-race"].needs = ["ci-required"] | .jobs["ci-race"].env.UPSTREAM = "${{ needs.ci-required.result }}"'
+mutate CI-NEEDS '.jobs["ci-race"] = .jobs["ci-required"] | .jobs["ci-race"].steps[-1].run = "task ci-race" | .jobs["ci-race"].needs = ["ci-required"] | .jobs["ci-race"].if = "${{ ALWAYS ( ) && !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}"'
+mutate CI-NEEDS '.jobs["ci-race"] = .jobs["ci-required"] | .jobs["ci-race"].steps[-1].run = "task ci-race" | .jobs["ci-race"].needs = ["ci-race"]'
+mutate CI-NEEDS '.jobs["ci-origin"] = .jobs["ci-required"] | .jobs["ci-origin"].steps[-1].run = "task ci-origin" | .jobs["ci-required"].needs = ["ci-origin"]'
+mutate CI-NEEDS '.jobs["ci-race"] = .jobs["ci-required"] | .jobs["ci-race"].steps[-1].run = "task ci-race" | .jobs["ci-race"].needs = ["ci-r.quired"]'
+# aggregation: any expression that reads dependency results, in any GitHub expression form
+exchange_lane='.jobs["ci-race"] = .jobs["ci-required"] | .jobs["ci-race"].steps[-1].run = "task ci-race" | .jobs["ci-race"].needs = ["ci-required"]'
+mutate CI-AGGREGATE "$exchange_lane"' | .jobs["ci-race"].env.UPSTREAM = "${{ needs.ci-required.result }}"'
+mutate CI-AGGREGATE "$exchange_lane"' | .jobs["ci-race"].env.UPSTREAM = "${{ Needs[ '"'"'ci-required'"'"' ].Result }}"'
+mutate CI-AGGREGATE "$exchange_lane"' | .jobs["ci-race"].if = "${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository && needs.*.result != '"'"'failure'"'"' }}"'
+mutate CI-AGGREGATE "$exchange_lane"' | .jobs["ci-race"].env.ALL = "${{ toJSON(needs) }}"'
+# inert text and dependency outputs are not aggregation
+inert="$tmp/inert"
+make_conformant_repo "$inert"
+yq -i "$exchange_lane"' | .jobs["ci-race"].env.NOTE = "plain text mentioning needs.ci-required.result is not an expression" | .jobs["ci-race"].env.BUNDLE = "${{ needs.ci-required.outputs.bundle_name }}"' "$inert/.github/workflows/ci.yml"
+git -C "$inert" commit -qam inert
+run_audit "$inert"; out="$audit_out"
+test "$audit_rc" -eq 0 || fail "audit: inert text and needs.<job>.outputs must not be aggregation:
+$out"
 mutate CI-MATRIX '.jobs["ci-required"].strategy.matrix.os = ["ubuntu-latest","macos-latest"]'
 mutate CI-TARGET '.jobs["ci-required"].steps[-1].run = "task check"'
 mutate CI-TARGET '.jobs["ci-required"].steps += [{"run":"task extra"}]'
@@ -234,13 +251,14 @@ mutate CI-FETCH-DEPTH 'del(.jobs["ci-required"].steps[0].with)'
 # a cross-runner artifact exchange between ci-* jobs is conformant: origin jobs feed destination jobs via needs
 exch="$tmp/exchange"
 make_conformant_repo "$exch"
-yq -i '.jobs["ci-origin-linux"] = .jobs["ci-required"] | .jobs["ci-origin-linux"].steps[-1].run = "task ci-origin-linux" | .jobs["ci-origin-windows"] = .jobs["ci-required"] | .jobs["ci-origin-windows"]["runs-on"] = "windows-latest" | .jobs["ci-origin-windows"].steps[-1].run = "task ci-origin-windows" | .jobs["ci-portable-linux"] = .jobs["ci-required"] | .jobs["ci-portable-linux"].steps[-1].run = "task ci-portable-linux" | .jobs["ci-portable-linux"].needs = ["ci-origin-linux","ci-origin-windows"]' "$exch/.github/workflows/ci.yml"
+# destination is declared before its origins to prove forward references resolve
+yq -i '.jobs["ci-portable-linux"] = .jobs["ci-required"] | .jobs["ci-portable-linux"].steps[-1].run = "task ci-portable-linux" | .jobs["ci-portable-linux"].needs = ["ci-origin-linux","ci-origin-windows"] | .jobs["ci-portable-linux"].steps = [.jobs["ci-portable-linux"].steps[0], {"uses":"actions/download-artifact@0123456789abcdef0123456789abcdef01234567","with":{"pattern":"bundle-*"}}] + .jobs["ci-portable-linux"].steps[1:] | .jobs["ci-origin-linux"] = .jobs["ci-required"] | .jobs["ci-origin-linux"].steps[-1].run = "task ci-origin-linux" | .jobs["ci-origin-linux"].steps += [{"uses":"actions/upload-artifact@fedcba9876543210fedcba9876543210fedcba98","with":{"name":"bundle-linux","path":"dist/bundle-linux.tar"}}] | .jobs["ci-origin-windows"] = .jobs["ci-origin-linux"] | .jobs["ci-origin-windows"]["runs-on"] = "windows-latest" | .jobs["ci-origin-windows"].steps[-2].run = "task ci-origin-windows" | .jobs["ci-origin-windows"].steps[-1].with.name = "bundle-windows"' "$exch/.github/workflows/ci.yml"
 yq -i '.tasks["ci-origin-linux"] = .tasks["ci-race"] | .tasks["ci-origin-windows"] = .tasks["ci-race"] | .tasks["ci-portable-linux"] = .tasks["ci-race"]' "$exch/Taskfile.yml"
 git -C "$exch" commit -qam exchange
 run_audit "$exch"; out="$audit_out"
 test "$audit_rc" -eq 0 || fail "audit: ci-* artifact-exchange graph must be conformant:
 $out"
-printf '%s\n' "$out" | rg -Fq 'Required jobs: `ci-required`, `ci-origin-linux`, `ci-origin-windows`, `ci-portable-linux`' || fail 'audit: exchange jobs must be listed as required'
+printf '%s\n' "$out" | rg -Fq 'Required jobs: `ci-required`, `ci-portable-linux`, `ci-origin-linux`, `ci-origin-windows`' || fail 'audit: exchange jobs must be listed as required'
 printf '%s\n' "$out" | rg -Fq 'ci-portable-linux` needs `ci-origin-linux`, `ci-origin-windows`' || fail 'audit: exchange edges must be reported'
 
 # a second well-formed lane is conformant
@@ -577,6 +595,9 @@ policy="$skill_root/references/ci-policy.md"
 rg -Fq 'types: [opened, synchronize, reopened, ready_for_review]' "$policy" || fail 'ci-policy.md: must state the trigger'
 rg -Fq 'ci-<lane>' "$policy" || fail 'ci-policy.md: must define ci-<lane> jobs'
 rg -Fq 'cross-runner artifact exchange' "$policy" || fail 'ci-policy.md: must define the needs: exception for cross-runner artifact exchange'
+if rg -qi 'never add `needs`' "$workflow_asset"; then fail 'ci.yml: header must not contradict the cross-runner exchange exception'; fi
+rg -Fq 'upload-artifact' "$skill_root/SKILL.md" || fail 'SKILL.md: Apply must authorize the artifact steps an exchange needs'
+if rg -q 'no job depends on another|`needs:` present' "$repo_root/docs/superpowers/specs/2026-08-18-simplify-ci-standard-design.md"; then fail 'spec: stale blanket needs: statements remain'; fi
 rg -Fq 'strict' "$policy" || fail 'ci-policy.md: must require strict up-to-date'
 rg -Fq 'squash' "$policy" || fail 'ci-policy.md: must require squash-only'
 if rg -qi 'expected_sha|status bridge|ci:certify|ci-certify|workflow_dispatch.*certif|labeled' "$policy"; then
