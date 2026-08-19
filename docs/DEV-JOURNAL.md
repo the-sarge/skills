@@ -196,3 +196,34 @@ Audit false positive fixed: `WF-TIMEOUT` no longer flags a job that only calls a
 ### Next
 
 - Sync to dotfiles; wellspring re-audit, then a plan that applies the two-part choice rule (own runner or timeout) and path-gated `ci-<lane>` targets instead of 20+ required jobs. Live view: [issue #8](https://github.com/the-sarge/skills/issues/8).
+
+---
+
+## Path-gated ci-<lane> targets and NUL-safe classifier - 2026-08-19 14:04 EDT
+
+**Main:** `af9f4d4cea4a`
+**Actor:** Claude
+
+### Summary
+
+Path-gated `ci-<lane>` targets are now a concrete mechanism, and the classifier handles non-ASCII and newline-bearing pathnames correctly. Landed on `main` as squash commit `af9f4d4` from [PR #19](https://github.com/the-sarge/skills/pull/19), prompted by two wellspring audits that read the standard as "fine-grained per-path lane selection is lost".
+
+### Completed
+
+- `assets/ci-classify.sh`: second mode — with `CI_MATCH_GLOBS` set (even empty) it prints `matches=true|false` (any changed file matches; fails closed to `true`, including on an empty value, a missing base, an empty diff, git failure, or `mktemp` failure). Pathnames are read NUL-delimited with `core.quotePath=false` in both modes, fixing a pre-existing docs-mode bug where a quoted non-ASCII path (e.g. `naïve.md`) was treated as not documentation.
+- `assets/Taskfile.ci.yml`: `ci-platform` example lane gated by `CI_PLATFORM_GLOBS`, plus a `platform` placeholder body.
+- `references/ci-policy.md`: Taskfile contract describes path-gated lanes; the choice rule is now three-way (own runner/timeout → `ci-<lane>`; same runner → fold into `task check`; not merge-blocking → non-required); Runners section carries the hosted-runner rule (a required job starts its runner on every non-draft same-repo PR run, docs-only included, so hosted — especially macOS/Windows — lanes belong in `release-gate` or a schedule unless genuinely merge-blocking). `references/migration.md` §1.2/§2/§3.3 and `SKILL.md` Audit carry the same rule, the glob variable per gated lane, and a hosted-runner count.
+- `scripts/test-skill.sh`: match-mode fixtures (match, no match, no base, empty diff, empty value, `GITHUB_OUTPUT`, one line, `mktemp` failure), odd-pathname fixtures in both modes, asset and prose greps, and an end-to-end `task ci-platform` run (not-applicable vs. lane body) when `task` is installed.
+
+### Decisions
+
+- Match mode is selected by variable presence, not content, so an undefined Taskfile variable fails closed (the lane runs) rather than silently switching to docs mode.
+- The classifier does not support negation or gitignore-style semantics; lanes declare positive globs only.
+
+### Validation
+
+- RAS review run `20260819T173834` (9 findings: 6 fix-now incl. the quoted-pathname bug, 3 duplicates); verification at `e7cc9e3` cleared with one low concern (`mktemp` guard) fixed in `7d0cabc` without another cycle. `test-skill.sh` passed under default bash and `/bin/bash` 3.2; shellcheck, actionlint, yq clean.
+
+### Next
+
+- Sync to dotfiles. Already-migrated repositories (codemux, tapmux, gridcast) carry the older `ci-classify.sh`; re-copy it from the asset on their next touch so non-ASCII documentation paths classify correctly. Wellspring plan guidance issued (codec matrices off the PR gate, hosted-Linux lanes collapsed, path-gated lanes, standard checkout with `sparse-checkout`). Live view: [issue #8](https://github.com/the-sarge/skills/issues/8).
