@@ -174,6 +174,11 @@ git -C "$cls_repo" checkout -q src-branch
 (cd "$cls_repo" && GITHUB_OUTPUT="$gh_out" CI_DEFAULT_BRANCH=main CI_MATCH_GLOBS='pkg/*' "$classify" >/dev/null 2>&1)
 test "$(cat "$gh_out")" = 'matches=true' || fail 'classifier: CI_MATCH_GLOBS must mirror matches= to GITHUB_OUTPUT'
 test "$(classify_in CI_DEFAULT_BRANCH=main CI_MATCH_GLOBS='pkg/*' | wc -l | tr -d ' ')" = 1 || fail 'classifier: CI_MATCH_GLOBS mode must print exactly one line'
+# mktemp failure must still produce the mode-appropriate one-line fail-closed answer and exit 0
+fakebin="$tmp/fakebin"; mkdir -p "$fakebin"; printf '#!/bin/sh\nexit 1\n' > "$fakebin/mktemp"; chmod +x "$fakebin/mktemp"
+test "$(classify_in PATH="$fakebin:$PATH" CI_DEFAULT_BRANCH=main)" = 'docs_only=false' || fail 'classifier: mktemp failure must fail closed to docs_only=false'
+test "$(classify_in PATH="$fakebin:$PATH" CI_DEFAULT_BRANCH=main CI_MATCH_GLOBS='pkg/*')" = 'matches=true' || fail 'classifier: mktemp failure must fail closed to matches=true'
+(cd "$cls_repo" && PATH="$fakebin:$PATH" CI_DEFAULT_BRANCH=main "$classify" >/dev/null 2>&1) || fail 'classifier: must exit 0 when mktemp fails'
 # set-but-empty CI_MATCH_GLOBS is match mode with no globs: fail closed to matches=true (an undefined Taskfile var)
 test "$(classify_in CI_DEFAULT_BRANCH=main CI_MATCH_GLOBS='')" = 'matches=true' || fail 'classifier: empty CI_MATCH_GLOBS must fail closed to matches=true'
 : > "$gh_out"

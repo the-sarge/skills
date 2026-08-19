@@ -66,7 +66,10 @@ fi
 
 # Pathnames are read NUL-delimited with quoting disabled so non-ASCII and newline-bearing
 # names are compared as-is (git would otherwise quote them, breaking the glob match).
-changed_list="$(mktemp)"
+if ! changed_list="$(mktemp 2>/dev/null)" || test -z "$changed_list"; then
+  printf 'ci-classify: cannot create a temporary file; failing closed\n' >&2
+  fail_closed
+fi
 trap 'rm -f "$changed_list"' EXIT
 if ! git -c core.quotePath=false diff --name-only --no-renames -z "$base" "$head" > "$changed_list"; then
   printf 'ci-classify: git diff failed; failing closed\n' >&2
