@@ -75,7 +75,7 @@ The workflow contains one or more independent required jobs. Each:
 - carries the same `if` guard, timeout, and pinned setup steps;
 - has its own `runs-on`, which is how per-lane runner routing works;
 - runs exactly one Taskfile target (`task ci` for `ci-required`, `task ci-<lane>` for others);
-- declares no `needs:` and is not aggregated by any other job.
+- is not aggregated by any other job and declares no `needs:`, except for a cross-runner artifact exchange (amended 2026-08-19): a destination `ci-<lane>` job may `needs:` origin `ci-*` jobs in the same workflow when it must consume an artifact produced on a different runner in the same run; every job in that graph is itself a required check, the downstream job does not use `always()`/`failure()`/`cancelled()`, and no job reads `needs.<job>.result`.
 
 The choice rule: a lane that is merge-blocking today becomes a standalone `ci-<lane>` job; a lane that is not merge-blocking moves to a non-required workflow. Because no job depends on another, each required check either ran and passed or is absent; absence blocks the merge. This is fail-closed without any aggregation script.
 

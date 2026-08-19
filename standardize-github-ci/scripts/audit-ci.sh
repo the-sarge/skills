@@ -56,6 +56,7 @@ printf -- '- Origin: `%s`\n\n' "$(git -C "$repo_root" remote get-url origin 2>/d
 workflow_dir="$repo_root/.github/workflows"
 ci_yml="$workflow_dir/ci.yml"
 required_jobs=""
+needs_edges=""
 printf '## Required workflow `.github/workflows/ci.yml`\n\n'
 if ! test -f "$ci_yml"; then
   printf -- '- Missing\n\n'
@@ -94,8 +95,29 @@ else
       || deviate CI-GUARD "ci.yml: job $job must guard with !github.event.pull_request.draft && head.repo.full_name == github.repository"
     jj '.["timeout-minutes"]|type=="number"' \
       || deviate CI-TIMEOUT "ci.yml: job $job must set timeout-minutes"
-    jj 'has("needs")|not' \
-      || deviate CI-NEEDS "ci.yml: job $job must not declare needs; required jobs are independent"
+    # needs: is permitted only for a cross-runner artifact exchange: every target must be a ci-* job in this
+    # workflow (hence itself a required check), and the job must not run when an upstream failed.
+    if jj 'has("needs")'; then
+      needs_list="$(printf '%s' "$jobjson" | jq -r '.needs | if type=="array" then .[] elif type=="string" then . else empty end' 2>/dev/null || true)"
+      needs_ok=true
+      if test -z "$needs_list"; then needs_ok=false; fi
+      while IFS= read -r dep; do
+        test -n "$dep" || continue
+        case "$dep" in
+          ci-*) printf '%s\n' "$job_names" | grep -qx -- "$dep" || needs_ok=false ;;
+          *) needs_ok=false ;;
+        esac
+      done <<< "$needs_list"
+      if jj '(.if // "") | test("always\\(\\)|failure\\(\\)|cancelled\\(\\)")'; then needs_ok=false; fi
+      if test "$needs_ok" = true; then
+        needs_edges="${needs_edges:+$needs_edges; }\`$job\` needs $(printf '%s\n' "$needs_list" | sed 's/.*/`&`/' | paste -sd, - | sed 's/,/, /g')"
+      else
+        deviate CI-NEEDS "ci.yml: job $job may declare needs only for a cross-runner artifact exchange: every target must be a ci-* job in ci.yml and the job must not use always(), failure(), or cancelled()"
+      fi
+    fi
+    if jj 'tostring | test("needs\\.[A-Za-z0-9_-]+\\.result")'; then
+      deviate CI-AGGREGATE "ci.yml: job $job inspects needs.<job>.result; jobs must not aggregate or summarize other jobs — each ci-* job is required on its own"
+    fi
     jj '(has("strategy")|not) or ((.strategy|type=="object") and (.strategy.matrix == null))' \
       || deviate CI-MATRIX "ci.yml: job $job must not use a matrix; route by job, not by matrix"
     printf '%s' "$stepsjson" | jq -e --arg t "$target" '[.[] | select(type=="object" and has("run")) | .run] == [$t]' >/dev/null 2>&1 \
@@ -114,6 +136,7 @@ else
   done <<< "$job_names"
 
   printf -- '- Required jobs: %s\n' "${required_jobs:-none}"
+  printf -- '- Artifact-exchange edges: %s\n' "${needs_edges:-none}"
   printf -- '- Runners:\n'
   printf '%s' "$wf" | jq -r '(.jobs? // {} | if type=="object" then . else {} end) | to_entries[] | "  - `\(.key)` = `\((.value | if type=="object" then .["runs-on"] else null end) | tostring)`"' 2>/dev/null || true
   printf '\n'
