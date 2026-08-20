@@ -52,7 +52,7 @@ Follow §1–§2 of [references/migration.md](references/migration.md). The plan
 Proceed only when the user explicitly asks to implement or has approved the plan. Follow §3–§8 of [references/migration.md](references/migration.md) in order. In particular:
 
 - work in an isolated worktree and feature branch;
-- copy assets verbatim ([assets/ci.yml](assets/ci.yml), [assets/ci-classify.sh](assets/ci-classify.sh), [assets/Taskfile.ci.yml](assets/Taskfile.ci.yml), [assets/ruleset.json](assets/ruleset.json)); do not hand-edit the workflow beyond `runs-on`, `ci-<lane>` jobs, job-level `env:`/`services:` a lane needs, and, for a cross-runner artifact exchange, `needs:` on destination `ci-<lane>` jobs plus SHA-pinned `actions/upload-artifact` / `actions/download-artifact` steps (the single `task` run step stays);
+- copy assets verbatim ([assets/ci.yml](assets/ci.yml), [assets/ci-classify.sh](assets/ci-classify.sh), [assets/Taskfile.ci.yml](assets/Taskfile.ci.yml), [assets/ruleset.json](assets/ruleset.json)); do not hand-edit the workflow beyond `runs-on`, the toolchain setup step (replace with the repository's SHA-pinned toolchain setup, or delete it when there is none), `ci-<lane>` jobs, job-level `env:`/`services:` a lane needs, and, for a cross-runner artifact exchange, `needs:` on destination `ci-<lane>` jobs plus SHA-pinned `actions/upload-artifact` / `actions/download-artifact` steps (the single `task` run step stays);
 - keep the diff scoped to CI standardization;
 - obtain explicit authorization before every external mutation (ruleset create/update, legacy protection removal, cancelling or rerunning a workflow, opening the PR);
 - open the migration PR as a draft and warn about the bootstrap run first.
