@@ -29,7 +29,7 @@ One CI shape for every repository: a `pull_request`-triggered workflow that skip
 
 ## Required workflow
 
-Every repository has `.github/workflows/ci.yml` copied from [`assets/ci.yml`](../assets/ci.yml). It is byte-identical across repositories except `runs-on` and any additional `ci-<lane>` jobs.
+Every repository has `.github/workflows/ci.yml` copied from [`assets/ci.yml`](../assets/ci.yml). It is byte-identical across repositories except `runs-on`, any additional `ci-<lane>` jobs, and the **toolchain setup step**: the asset ships `actions/setup-go` because most of the portfolio is Go, but that one step is the language slot — a repository with a different toolchain replaces it with its own SHA-pinned setup step(s), and a repository with no toolchain to install (for example a pure-shell repository) deletes it. Checkout with `fetch-depth: 0`, the pinned `setup-task` step, the guard, timeout, permissions, concurrency, and the single `task` call are fixed.
 
 - Trigger: exactly `pull_request` with `types: [opened, synchronize, reopened, ready_for_review]`. No `push`, `workflow_dispatch`, `pull_request_target`, `paths`, `paths-ignore`, or `branches` filters.
 - Concurrency: `group: ci-${{ github.event.pull_request.number }}`, `cancel-in-progress: true`.

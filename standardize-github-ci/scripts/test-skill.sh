@@ -226,6 +226,17 @@ expect_deviation() { # output code
 $1"
 }
 
+# a repository with no language toolchain deletes the setup-go step; still conformant
+notool="$tmp/no-toolchain"
+make_conformant_repo "$notool"
+yq -i 'del(.jobs["ci-required"].steps[] | select(.uses | (. // "") | test("^actions/setup-go@")))' "$notool/.github/workflows/ci.yml"
+rm -f "$notool/go.mod"
+run_audit "$notool"; out="$audit_out"
+test "$audit_rc" -eq 0 || fail "audit: deleting the toolchain setup step must stay conformant; got $audit_rc:
+$out"
+printf '%s\n' "$out" | rg -Fq -- '- None. Repository conforms to the standard.' || fail "audit: no-toolchain repo must report no deviations:
+$out"
+
 conf="$tmp/conformant"
 make_conformant_repo "$conf"
 run_audit "$conf"; out="$audit_out"
@@ -750,6 +761,9 @@ rg -Fq 'cross-runner artifact exchange' "$policy" || fail 'ci-policy.md: must de
 rg -Fq 'CI_MATCH_GLOBS' "$policy" || fail 'ci-policy.md: must describe path-gated ci-<lane> targets via CI_MATCH_GLOBS'
 rg -Fq 'fold into `task check`' "$policy" || fail 'ci-policy.md: choice rule must include the fold-into-check branch'
 rg -Fq 'hosted runner' "$policy" || fail 'ci-policy.md: Runners section must carry the hosted-runner cost rule'
+rg -Fq 'toolchain setup step' "$policy" || fail 'ci-policy.md: must document the toolchain setup step as the variable slot (replace per toolchain, delete when none)'
+rg -Fq 'toolchain setup step' "$skill_root/references/migration.md" || fail 'migration.md: apply must carry the toolchain setup slot allowance'
+rg -B1 -F 'actions/setup-go@' "$workflow_asset" | rg -q '^\s*#.*[Tt]oolchain' || fail 'ci.yml: the setup-go step must be marked as the toolchain slot with a comment'
 rg -Fq 'path-gated' "$skill_root/SKILL.md" || fail 'SKILL.md: audit checklist must record path-gated lanes and hosted runners'
 rg -Fq 'glob variable' "$skill_root/references/migration.md" || fail 'migration.md: plan/apply must carry each gated lane glob variable'
 rg -Fq 'path-gated' "$skill_root/references/migration.md" || fail 'migration.md: must tell migrators to path-gate conditional lanes inside the Taskfile'
