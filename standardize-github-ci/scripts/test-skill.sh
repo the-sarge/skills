@@ -763,6 +763,9 @@ rg -Fq 'fold into `task check`' "$policy" || fail 'ci-policy.md: choice rule mus
 rg -Fq 'hosted runner' "$policy" || fail 'ci-policy.md: Runners section must carry the hosted-runner cost rule'
 rg -Fq 'toolchain setup step' "$policy" || fail 'ci-policy.md: must document the toolchain setup step as the variable slot (replace per toolchain, delete when none)'
 rg -Fq 'toolchain setup step' "$skill_root/references/migration.md" || fail 'migration.md: apply must carry the toolchain setup slot allowance'
+rg -Fq 'toolchain setup step' "$skill_root/SKILL.md" || fail 'SKILL.md: apply scope must carry the toolchain setup slot allowance'
+head -8 "$workflow_asset" | rg -q 'toolchain setup slot' || fail 'ci.yml: header must name the toolchain setup slot among the allowed variations'
+if head -8 "$workflow_asset" | rg -q 'change only `runs-on`\.'; then fail 'ci.yml: header must not claim runs-on is the only allowed change'; fi
 rg -B1 -F 'actions/setup-go@' "$workflow_asset" | rg -q '^\s*#.*[Tt]oolchain' || fail 'ci.yml: the setup-go step must be marked as the toolchain slot with a comment'
 rg -Fq 'path-gated' "$skill_root/SKILL.md" || fail 'SKILL.md: audit checklist must record path-gated lanes and hosted runners'
 rg -Fq 'glob variable' "$skill_root/references/migration.md" || fail 'migration.md: plan/apply must carry each gated lane glob variable'

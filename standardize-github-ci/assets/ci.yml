@@ -1,7 +1,9 @@
 # Portfolio required CI workflow. Copy verbatim; change only `runs-on`
-# and, when a repository has additional merge-blocking lanes, add sibling
-# `ci-<lane>` jobs with the same guard, timeout, setup steps, and one
-# `task ci-<lane>` step. Never add `strategy.matrix`, other triggers, or
+# and the marked toolchain setup slot below (replace with the repository's
+# own SHA-pinned toolchain setup, or delete it when there is nothing to
+# install), and, when a repository has additional merge-blocking lanes, add
+# sibling `ci-<lane>` jobs with the same guard, timeout, setup steps, and
+# one `task ci-<lane>` step. Never add `strategy.matrix`, other triggers, or
 # path filters; `needs` is allowed only on a destination `ci-<lane>` job of
 # a cross-runner artifact exchange (see references/ci-policy.md).
 name: ci
