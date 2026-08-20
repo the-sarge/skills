@@ -238,3 +238,32 @@ Path-gated `ci-<lane>` targets are now a concrete mechanism, and the classifier 
 ### Correction
 
 The preceding entry's Validation line says the `mktemp` guard was "fixed in `7d0cabc`". That SHA is the previous journal commit (#18), not the fix. The guard was PR #19's last branch commit `8170aa9`, which landed inside squash commit `af9f4d4`.
+
+---
+
+## Toolchain setup slot - 2026-08-19 21:19 EDT
+
+**Main:** `3152af0e0200`
+**Actor:** Claude (Fable 5, standardize-github-ci)
+
+**Summary**
+
+Merged [PR #22](https://github.com/the-sarge/skills/pull/22) as `3152af0`: the required workflow's toolchain setup step is now the documented language slot. `assets/ci.yml` ships `actions/setup-go` as the Go instantiation; a repository with a different toolchain replaces it with its own SHA-pinned setup, and a repository with no toolchain (nettotalizer, Bash-only) deletes it. Checkout with `fetch-depth: 0`, the pinned `setup-task` step, guard, timeout, permissions, concurrency, and the single `task` call stay fixed. The conformance auditor never required setup-go, so no auditor change and the 12 migrated Go repos are untouched.
+
+**Completed**
+
+- `references/ci-policy.md` Required-workflow prose, `references/migration.md` §3.1, `SKILL.md` apply scope, and the asset's header and inline marker all carry the slot rule.
+- `scripts/test-skill.sh` (test-first): a conformant fixture with the setup-go step deleted audits `None. Repository conforms to the standard.`; the three prose surfaces, the inline marker, and the header (including rejection of the stale "change only runs-on" claim) are asserted.
+
+**Decisions**
+
+- Chosen over per-language asset variants and over stripping setup-go from the asset: one Go-flavored asset with a marked slot keeps the fleet-wide "same file everywhere" property. Origin: nettotalizer's audit exception (operator-approved 2026-08-19, now ordinary policy).
+- RAS review `20260820T005116-4f84bbea9422d8b767af098b`: fix-now C-003 (SKILL.md assertion) and C-007 (asset-header contradiction) fixed in `b8ee187`, mutation-checked; verification clear; replacement review `20260820T010732-0b7b3572bd331956c06f5c5f` clean.
+
+**Validation**
+
+- `scripts/test-skill.sh` green at `b8ee187` (new assertions failed before the prose/header changes).
+
+**Next**
+
+- Sync `standardize-github-ci/` into dotfiles so the installed skill carries the slot rule; nettotalizer can then migrate without a documented exception. Tracking: issue #8.
