@@ -42,12 +42,16 @@ deviate() { # code, message
 
 # Cache-locality drift check: no job on a self-hosted runner label uses the
 # GitHub Actions cache (the infra repository's decision 0017). Takes a jobs
-# map (JSON object) and prints one "<job>\t<uses>" line per offending step: an
-# actions/setup-* step whose with.cache is not false, or any actions/cache
-# step. A job whose runs-on contains an expression cannot be classified at
-# audit time and is skipped, so the guarantee is the canonical subset of
-# literal labels; hosted labels (ubuntu-*, macos-*, windows-*) keep the
-# action default.
+# map (JSON object) and prints one "<job>\t<uses>" line per offending step:
+# an actions/setup-go step whose with.cache is not false (its cache input
+# defaults to true), any other actions/setup-* step that enables its cache
+# (those inputs are off by default, and cache: false is not a valid value
+# for the string-typed ones -- setup-node rejects it), or any actions/cache
+# step. A job is classified self-hosted when any literal runs-on label is
+# not a hosted one (ubuntu-*, macos-*, windows-*), even beside expression
+# labels; a job whose only runner evidence is an expression cannot be
+# classified at audit time and is skipped, so the guarantee is that
+# canonical subset.
 cache_violations() { # jobs-map-json
   printf '%s' "$1" | jq -r '
     to_entries[]
@@ -58,16 +62,18 @@ cache_violations() { # jobs-map-json
          elif type=="array" then [.[] | select(type=="string")]
          elif type=="object" then ((.labels // []) | if type=="string" then [.] elif type=="array" then [.[] | select(type=="string")] else [] end)
          else [] end) as $labels
-    | select(($labels | length) > 0
-             and (($labels | any(contains("${{"))) | not)
-             and (($labels | all(test("^(ubuntu|macos|windows)-"; "i"))) | not))
+    | select($labels
+             | map(select(contains("${{") | not))
+             | any(test("^(ubuntu|macos|windows)-"; "i") | not))
     | ((.value.steps? // []) | if type=="array" then . else [] end)[]
     | select(type=="object" and has("uses") and (.uses | type=="string"))
-    | select(
-        ((.uses | test("^actions/setup-[A-Za-z0-9_.-]+@"))
-         and ((((.with? // {}) | if type=="object" then .cache else null end)) as $c
-              | (($c == false) or ($c == "false")) | not))
-        or (.uses | test("^actions/cache(/(save|restore))?@")))
+    | ((((.with? // {}) | if type=="object" then .cache else null end)) as $c
+       | select(
+           ((.uses | test("^actions/setup-go@"))
+            and ((($c == false) or ($c == "false")) | not))
+           or ((.uses | test("^actions/setup-[A-Za-z0-9_.-]+@"))
+               and ($c != null) and ($c != false) and ($c != "false") and ($c != ""))
+           or (.uses | test("^actions/cache(/(save|restore))?@"))))
     | "\($name)\t\(.uses)"' 2>/dev/null || true
 }
 
@@ -183,7 +189,7 @@ else
   test -n "$jobs_map" || jobs_map='{}'
   while IFS=$'\t' read -r cache_job cache_uses; do
     test -n "$cache_job" || continue
-    deviate CI-CACHE "ci.yml: job $cache_job runs on a self-hosted label but $cache_uses leaves the GitHub Actions cache enabled; self-hosted jobs never use it — set cache: false on actions/setup-* steps and remove actions/cache steps"
+    deviate CI-CACHE "ci.yml: job $cache_job runs on a self-hosted label but $cache_uses leaves the GitHub Actions cache enabled; self-hosted jobs never use it — set cache: false on actions/setup-go steps, drop enabled cache inputs from other setup actions, and remove actions/cache steps"
   done <<< "$(cache_violations "$jobs_map")"
 
   printf -- '- Required jobs: %s\n' "${required_jobs:-none}"
@@ -247,7 +253,7 @@ if test -d "$workflow_dir"; then
     done <<< "$(printf '%s' "$ojobs" | jq -r '.[] | (if type=="object" then (.steps? // []) else [] end) | (if type=="array" then . else [] end) | .[] | select(type=="object" and has("uses")) | .uses' 2>/dev/null || true)"
     while IFS=$'\t' read -r cache_job cache_uses; do
       test -n "$cache_job" || continue
-      deviate WF-CACHE "$rel: job $cache_job runs on a self-hosted label but $cache_uses leaves the GitHub Actions cache enabled; self-hosted jobs never use it — set cache: false on actions/setup-* steps and remove actions/cache steps"
+      deviate WF-CACHE "$rel: job $cache_job runs on a self-hosted label but $cache_uses leaves the GitHub Actions cache enabled; self-hosted jobs never use it — set cache: false on actions/setup-go steps, drop enabled cache inputs from other setup actions, and remove actions/cache steps"
     done <<< "$(cache_violations "$ojobs")"
   done <<< "$(find "$workflow_dir" -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) -print | sort)"
 fi
