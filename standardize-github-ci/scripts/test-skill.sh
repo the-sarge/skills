@@ -578,6 +578,19 @@ mutate CI-CACHE '.jobs["ci-required"]["runs-on"] = "self-hosted-xlarge" | (.jobs
 mutate CI-CACHE '.jobs["ci-required"]["runs-on"] = ["self-hosted", "linux"] | del(.jobs["ci-required"].steps[] | select(.uses | (. // "") | test("^actions/setup-go@")) | .with.cache)'
 mutate CI-CACHE '.jobs["ci-required"]["runs-on"] = "self-hosted-xlarge" | .jobs["ci-required"].steps += [{"uses":"actions/setup-node@0123456789abcdef0123456789abcdef01234567","with":{"cache":"npm"}}]'
 mutate CI-CACHE '.jobs["ci-required"]["runs-on"] = "self-hosted-xlarge" | .jobs["ci-required"].steps += [{"uses":"actions/cache@0123456789abcdef0123456789abcdef01234567","with":{"path":"~/.cache/go-build","key":"go-build"}}]'
+# a literal self-hosted label beside an expression label still classifies the job
+mutate CI-CACHE '.jobs["ci-required"]["runs-on"] = ["self-hosted", "linux", "${{ matrix.runner_label }}"] | del(.jobs["ci-required"].steps[] | select(.uses | (. // "") | test("^actions/setup-go@")) | .with.cache)'
+
+# setup actions whose cache input is off by default stay unset on self-hosted jobs:
+# cache: false is not a valid value for their string-typed inputs (setup-node
+# rejects it), so an absent cache input is conformant, not a deviation
+offdefault="$tmp/cache-off-default"
+make_conformant_repo "$offdefault"
+yq -i '.jobs["ci-required"]["runs-on"] = "self-hosted-xlarge" | .jobs["ci-required"].steps += [{"uses":"actions/setup-node@0123456789abcdef0123456789abcdef01234567","with":{"node-version":"24"}}]' "$offdefault/.github/workflows/ci.yml"
+git -C "$offdefault" commit -qam offdefault
+run_audit "$offdefault"; out="$audit_out"
+test "$audit_rc" -eq 0 || fail "audit: setup-node without a cache input on a self-hosted job must be conformant; got $audit_rc:
+$out"
 
 # hosted jobs may keep the action default: cache enabled by omission is conformant
 hostedcache="$tmp/cache-hosted"
