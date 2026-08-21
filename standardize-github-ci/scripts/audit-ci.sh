@@ -40,6 +40,37 @@ deviate() { # code, message
   fi
 }
 
+# Cache-locality drift check: no job on a self-hosted runner label uses the
+# GitHub Actions cache (the infra repository's decision 0017). Takes a jobs
+# map (JSON object) and prints one "<job>\t<uses>" line per offending step: an
+# actions/setup-* step whose with.cache is not false, or any actions/cache
+# step. A job whose runs-on contains an expression cannot be classified at
+# audit time and is skipped, so the guarantee is the canonical subset of
+# literal labels; hosted labels (ubuntu-*, macos-*, windows-*) keep the
+# action default.
+cache_violations() { # jobs-map-json
+  printf '%s' "$1" | jq -r '
+    to_entries[]
+    | select(.value | type=="object")
+    | .key as $name
+    | (.value["runs-on"]
+       | if type=="string" then [.]
+         elif type=="array" then [.[] | select(type=="string")]
+         elif type=="object" then ((.labels // []) | if type=="string" then [.] elif type=="array" then [.[] | select(type=="string")] else [] end)
+         else [] end) as $labels
+    | select(($labels | length) > 0
+             and (($labels | any(contains("${{"))) | not)
+             and (($labels | all(test("^(ubuntu|macos|windows)-"; "i"))) | not))
+    | ((.value.steps? // []) | if type=="array" then . else [] end)[]
+    | select(type=="object" and has("uses") and (.uses | type=="string"))
+    | select(
+        ((.uses | test("^actions/setup-[A-Za-z0-9_.-]+@"))
+         and ((((.with? // {}) | if type=="object" then .cache else null end)) as $c
+              | (($c == false) or ($c == "false")) | not))
+        or (.uses | test("^actions/cache(/(save|restore))?@")))
+    | "\($name)\t\(.uses)"' 2>/dev/null || true
+}
+
 # --- header
 printf '# CI conformance audit: %s\n\n' "$(basename "$repo_root")"
 printf -- '- Repository: `%s`\n' "$repo_root"
@@ -148,6 +179,13 @@ else
       || deviate CI-FETCH-DEPTH "ci.yml: job $job must check out with fetch-depth: 0"
   done <<< "$job_names"
 
+  jobs_map="$(printf '%s' "$wf" | jq -c '(.jobs? // {}) | if type=="object" then . else {} end' 2>/dev/null)" || jobs_map='{}'
+  test -n "$jobs_map" || jobs_map='{}'
+  while IFS=$'\t' read -r cache_job cache_uses; do
+    test -n "$cache_job" || continue
+    deviate CI-CACHE "ci.yml: job $cache_job runs on a self-hosted label but $cache_uses leaves the GitHub Actions cache enabled; self-hosted jobs never use it — set cache: false on actions/setup-* steps and remove actions/cache steps"
+  done <<< "$(cache_violations "$jobs_map")"
+
   printf -- '- Required jobs: %s\n' "${required_jobs:-none}"
   printf -- '- Artifact-exchange edges: %s\n' "${needs_edges:-none}"
   printf -- '- Runners:\n'
@@ -207,6 +245,10 @@ if test -d "$workflow_dir"; then
       printf '%s' "$uses" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(/[A-Za-z0-9_./-]+)?@[0-9a-f]{40}$' \
         || deviate WF-PIN "$rel: unpinned action $uses"
     done <<< "$(printf '%s' "$ojobs" | jq -r '.[] | (if type=="object" then (.steps? // []) else [] end) | (if type=="array" then . else [] end) | .[] | select(type=="object" and has("uses")) | .uses' 2>/dev/null || true)"
+    while IFS=$'\t' read -r cache_job cache_uses; do
+      test -n "$cache_job" || continue
+      deviate WF-CACHE "$rel: job $cache_job runs on a self-hosted label but $cache_uses leaves the GitHub Actions cache enabled; self-hosted jobs never use it — set cache: false on actions/setup-* steps and remove actions/cache steps"
+    done <<< "$(cache_violations "$ojobs")"
   done <<< "$(find "$workflow_dir" -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) -print | sort)"
 fi
 if test "$other_count" -eq 0; then
