@@ -561,6 +561,74 @@ git -C "$lanetf" commit -qam lane
 run_audit "$lanetf"; out="$audit_out"
 expect_deviation "$out" TASK-LANE-MISSING
 
+# --- self-hosted cache locality: no self-hosted job uses the GitHub Actions cache
+
+# the asset ships cache: false, so a self-hosted lane built from it is conformant
+swept="$tmp/cache-swept"
+make_conformant_repo "$swept"
+yq -i '.jobs["ci-required"]["runs-on"] = "repo-garm-linux-arm64"' "$swept/.github/workflows/ci.yml"
+git -C "$swept" commit -qam swept
+run_audit "$swept"; out="$audit_out"
+test "$audit_rc" -eq 0 || fail "audit: self-hosted job with cache: false must be conformant; got $audit_rc:
+$out"
+
+# seeded violations: cache enabled explicitly, by omission, by a package-manager
+# string, or via an actions/cache step, on a self-hosted job
+mutate CI-CACHE '.jobs["ci-required"]["runs-on"] = "self-hosted-xlarge" | (.jobs["ci-required"].steps[] | select(.uses | (. // "") | test("^actions/setup-go@")) | .with.cache) = true'
+mutate CI-CACHE '.jobs["ci-required"]["runs-on"] = ["self-hosted", "linux"] | del(.jobs["ci-required"].steps[] | select(.uses | (. // "") | test("^actions/setup-go@")) | .with.cache)'
+mutate CI-CACHE '.jobs["ci-required"]["runs-on"] = "self-hosted-xlarge" | .jobs["ci-required"].steps += [{"uses":"actions/setup-node@0123456789abcdef0123456789abcdef01234567","with":{"cache":"npm"}}]'
+mutate CI-CACHE '.jobs["ci-required"]["runs-on"] = "self-hosted-xlarge" | .jobs["ci-required"].steps += [{"uses":"actions/cache@0123456789abcdef0123456789abcdef01234567","with":{"path":"~/.cache/go-build","key":"go-build"}}]'
+
+# hosted jobs may keep the action default: cache enabled by omission is conformant
+hostedcache="$tmp/cache-hosted"
+make_conformant_repo "$hostedcache"
+yq -i 'del(.jobs["ci-required"].steps[] | select(.uses | (. // "") | test("^actions/setup-go@")) | .with.cache)' "$hostedcache/.github/workflows/ci.yml"
+git -C "$hostedcache" commit -qam hosted
+run_audit "$hostedcache"; out="$audit_out"
+test "$audit_rc" -eq 0 || fail "audit: hosted job may keep the cache default; got $audit_rc:
+$out"
+
+# a runtime-resolved runner cannot be classified: canonical-subset guarantee, no deviation
+dyncache="$tmp/cache-dynamic"
+make_conformant_repo "$dyncache"
+yq -i '.jobs["ci-required"]["runs-on"] = "${{ inputs.runner_label }}" | del(.jobs["ci-required"].steps[] | select(.uses | (. // "") | test("^actions/setup-go@")) | .with.cache)' "$dyncache/.github/workflows/ci.yml"
+git -C "$dyncache" commit -qam dynamic
+run_audit "$dyncache"; out="$audit_out"
+if printf '%s\n' "$out" | rg -Fq '`CI-CACHE`'; then
+  fail "audit: a runtime-resolved runs-on must not be classified as self-hosted:
+$out"
+fi
+
+# the check covers non-required workflows too
+wfcache="$tmp/cache-wf"
+make_conformant_repo "$wfcache"
+cat > "$wfcache/.github/workflows/deep.yml" <<'YAML'
+name: deep
+on:
+  schedule:
+    - cron: '7 2 * * *'
+jobs:
+  deep:
+    runs-on: repo-garm-linux-arm64
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+      - run: task deep
+YAML
+git -C "$wfcache" add . && git -C "$wfcache" commit -qm wfcache
+run_audit "$wfcache"; out="$audit_out"
+test "$audit_rc" -eq 3 || fail "audit: self-hosted setup-go without cache: false in a non-required workflow must exit 3; got $audit_rc:
+$out"
+expect_deviation "$out" WF-CACHE
+yq -i '(.jobs.deep.steps[] | select(.uses | (. // "") | test("^actions/setup-go@")) | .with.cache) = false' "$wfcache/.github/workflows/deep.yml"
+git -C "$wfcache" commit -qam wfcache-fixed
+run_audit "$wfcache"; out="$audit_out"
+test "$audit_rc" -eq 0 || fail "audit: cache: false on the self-hosted job must clear WF-CACHE; got $audit_rc:
+$out"
+
 # ruleset from JSON
 good_rules="$tmp/rules-good.json"
 cat > "$good_rules" <<'JSON'
@@ -767,6 +835,11 @@ rg -Fq 'toolchain setup step' "$skill_root/SKILL.md" || fail 'SKILL.md: apply sc
 head -8 "$workflow_asset" | rg -q 'toolchain setup slot' || fail 'ci.yml: header must name the toolchain setup slot among the allowed variations'
 if head -8 "$workflow_asset" | rg -q 'change only `runs-on`\.'; then fail 'ci.yml: header must not claim runs-on is the only allowed change'; fi
 rg -B1 -F 'actions/setup-go@' "$workflow_asset" | rg -q '^\s*#.*[Tt]oolchain' || fail 'ci.yml: the setup-go step must be marked as the toolchain slot with a comment'
+rg -Fq 'cache: false' "$workflow_asset" || fail 'ci.yml: the setup-go step must set cache: false'
+rg -Fq 'cache: false' "$policy" || fail 'ci-policy.md: must state the self-hosted cache: false rule'
+rg -Fq 'GitHub Actions cache' "$policy" || fail 'ci-policy.md: must forbid the GitHub Actions cache on self-hosted labels'
+rg -Fq 'CI-CACHE' "$policy" || fail 'ci-policy.md: must name the CI-CACHE/WF-CACHE audit codes'
+rg -Fq 'cache: false' "$skill_root/SKILL.md" || fail 'SKILL.md: replacement toolchain setup must keep cache: false'
 rg -Fq 'path-gated' "$skill_root/SKILL.md" || fail 'SKILL.md: audit checklist must record path-gated lanes and hosted runners'
 rg -Fq 'glob variable' "$skill_root/references/migration.md" || fail 'migration.md: plan/apply must carry each gated lane glob variable'
 rg -Fq 'path-gated' "$skill_root/references/migration.md" || fail 'migration.md: must tell migrators to path-gate conditional lanes inside the Taskfile'
