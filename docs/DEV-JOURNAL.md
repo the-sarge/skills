@@ -298,3 +298,23 @@ Merged [PR #24](https://github.com/the-sarge/skills/pull/24) as `234e9a5`: no jo
 
 - The 11-repository `cache: false` sweep (infra PRs 3–13 of the 0017 program), then cache purges; tracked in the infra repository.
 - Sync `standardize-github-ci/` into dotfiles so the installed skill carries the cache rule (issue #8's existing sync item).
+
+---
+
+## Cache drift check input semantics - 2026-08-21 16:02 EDT
+
+**Main:** `5c728d7`
+**Actor:** Claude (Fable 5, 0017 rollout)
+
+**Summary**
+
+Merged [PR #26](https://github.com/the-sarge/skills/pull/26) as `5c728d7`, refining the `CI-CACHE`/`WF-CACHE` drift check from #24 before the decision 0017 portfolio sweep applies it.
+
+**Completed**
+
+- The check now follows each setup action's input semantics: `cache: false` is required on `actions/setup-go` (the only setup action whose cache defaults on), other `actions/setup-*` steps deviate only when they *enable* a cache, and every `actions/cache` step still deviates. `cache: false` is an invalid value for the string-typed package-manager inputs (setup-node fails the job on it), so the old universal requirement would have forced a job-breaking edit onto ai-cli's six self-hosted setup-node steps.
+- A literal non-hosted `runs-on` label now classifies a job self-hosted even beside expression labels, bringing tapmux `test-linux` and the cpace/cpace-x25519 fuzz matrices (literal `self-hosted` next to `${{ … }}`) into the audited canonical subset. Only jobs whose entire runner evidence is an expression remain unclassifiable.
+
+**Validation**
+
+- `scripts/test-skill.sh` green with new fixtures (setup-node without a cache input conformant on self-hosted; literal-beside-expression labels flagged); `shellcheck` clean; live spot-checks match the 0017 sweep table exactly (infra 2, ai-cli 7, tapmux 5, cpace 1 findings).
