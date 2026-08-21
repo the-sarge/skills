@@ -267,3 +267,34 @@ Merged [PR #22](https://github.com/the-sarge/skills/pull/22) as `3152af0`: the r
 **Next**
 
 - Sync `standardize-github-ci/` into dotfiles so the installed skill carries the slot rule; nettotalizer can then migrate without a documented exception. Tracking: issue #8.
+
+---
+
+## Self-hosted CI cache rule - 2026-08-21 15:54 EDT
+
+**Main:** `234e9a5`
+**Actor:** Claude (Fable 5, 0017 rollout)
+
+**Summary**
+
+Merged [PR #24](https://github.com/the-sarge/skills/pull/24) as `234e9a5`: no job on a self-hosted runner label uses the GitHub Actions cache. This is PR 2 of the decision 0017 rollout (`the-sarge/infra` `docs/decisions/0017-self-hosted-ci-cache-locality.md`): the portfolio triggers CI only on `pull_request`, so every cache entry is scoped to `refs/pull/N/merge` and is never restored — write-only upload cost that fills GitHub's 10-GB per-repository quota, re-uploading state a warm self-hosted runner already holds locally.
+
+**Completed**
+
+- `assets/ci.yml`: the toolchain slot's `setup-go` step ships `cache: false`; the slot comment says a replacement toolchain setup keeps it.
+- `references/ci-policy.md`: the rule stated in Runners (self-hosted jobs set `cache: false` on `actions/setup-*` steps and carry no `actions/cache` steps, in `ci.yml` and every other workflow; hosted jobs may keep the action default), cross-referenced from the toolchain-slot paragraph and `SKILL.md`'s apply scope.
+- `scripts/audit-ci.sh`: drift codes `CI-CACHE` / `WF-CACHE` from a shared `cache_violations` jq pass over each workflow's jobs map. The checker is what makes the rule hold — 21 of the 41 affected portfolio jobs live in workflows not generated from the asset.
+
+**Decisions**
+
+- The audited guarantee is the canonical subset of literal runner labels: a `runs-on` that resolves at runtime (`${{ inputs.runner_label }}` and matrix expressions) cannot be classified at audit time and is skipped, per the 0017 rollout plan. The two known runtime-resolved lanes are handled by the sweep itself.
+
+**Validation**
+
+- `scripts/test-skill.sh` green with new fixtures: seeded violations exit 3 (explicit `cache: true`, enabled-by-omission, package-manager string, `actions/cache` step; in `ci.yml` and in a non-required workflow) and swept shapes exit 0 (self-hosted with `cache: false`, hosted default, runtime-resolved `runs-on`). `shellcheck` and `actionlint` clean.
+- Against the live `the-sarge/infra` checkout, the audit reports exactly the two jobs infra's sweep PR will fix: `ci.yml::ci-required` and `deep-check.yml::deep-check`.
+
+**Next**
+
+- The 11-repository `cache: false` sweep (infra PRs 3–13 of the 0017 program), then cache purges; tracked in the infra repository.
+- Sync `standardize-github-ci/` into dotfiles so the installed skill carries the cache rule (issue #8's existing sync item).
