@@ -318,3 +318,29 @@ Merged [PR #26](https://github.com/the-sarge/skills/pull/26) as `5c728d7`, refin
 **Validation**
 
 - `scripts/test-skill.sh` green with new fixtures (setup-node without a cache input conformant on self-hosted; literal-beside-expression labels flagged); `shellcheck` clean; live spot-checks match the 0017 sweep table exactly (infra 2, ai-cli 7, tapmux 5, cpace 1 findings).
+
+---
+
+## Design-cost reference - 2026-10-14 18:47 EDT
+
+**Main:** `3668f88934af`
+**Actor:** Claude (Opus 5.5, design-cost reference)
+
+**Summary**
+
+Merged [PR #32](https://github.com/the-sarge/skills/pull/32) as `3668f88`, adding `_shared/DESIGN-COST.md`: a shared reference for weighing design options by the ordering and consistency obligations they add or remove, ahead of contract changes and footprint. It came from comparing two upstream quic-go fixes for the same bug ([quic-go/quic-go#5845](https://github.com/quic-go/quic-go/pull/5845), closed as too complicated, and [quic-go/quic-go#5911](https://github.com/quic-go/quic-go/pull/5911), merged), and from finding that a quic-go-fast plan written under `architecture-handoff` had chosen the side-channel design and rejected the synchronous route without a recorded reason or revisit condition.
+
+**Completed**
+
+- The reference treats hand-offs between execution contexts as interface cost, keeps decisions with the state owner, asks for the owner's design before accepting a contained side channel, gives every rejected alternative a reason and either a revisit trigger or `none: rejected on merit`, and counts borrowed invariants as obligations.
+- Hooks point to the reference instead of restating it: planit's blast-radius ranking; architecture-handoff's slice gates, template, audit list and final audit; implement-architecture-slice's scoped re-audit; code-smell-audit's production and cross-cutting lenses and conventions record; and ras-improve-architecture's default operator guidance. `CONTRACT-CLOSURE.md` and `REVIEW-LOOP.md` are unchanged.
+- Synced to dotfiles through [the-sarge/dotfiles#20](https://github.com/the-sarge/dotfiles/pull/20) (`a5c89a2`), a verbatim copy of the eight changed skill files.
+
+**Decisions**
+
+- The principles live in `_shared/` rather than in `codebase-design`, `improve-codebase-architecture` or `code-review`, which are vendored from `mattpocock/skills` through `.skill-lock.json` and would lose local edits on update. Rationale and review history are in [PR #32](https://github.com/the-sarge/skills/pull/32).
+
+**Validation**
+
+- `ras consider` run `20261014T211252-f0663a69bc71c59d064529a2` (six reviewers; adjudication and synthesis completed) consolidated 46 findings into ten fixes. All ten were accepted after independent disposition and applied before merge. One report that auditor subagents cannot resolve the reference's relative link was deferred as unconfirmed. The revised document was not re-run through `ras consider`.
+- `git diff --check` passed, the governing shared policies showed no diff, and the live `~/.agents/skills` copies byte-match `3668f88` after the dotfiles fast-forward.
