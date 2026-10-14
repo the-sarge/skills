@@ -27,7 +27,9 @@ Use these shapes after the slice graph passes the agent's evidence audit. Keep p
 
 {Grilled interface, ownership, invariants, ordering, failure modes, and reasoning.}
 
-**Rejected alternative (do not do this):** {Likely wrong turn and why.}
+**Rejected alternative (do not do this):** {Likely wrong turn and why.} **Revisit if:** {Observable event that reopens it, or `none: rejected on merit`.}
+
+**Owner's design:** {When the decision is a contained design: the owner's design, whether it was adopted, and if not, the obligations the chosen design adds relative to it, per the shared design-cost reference. Otherwise "n/a".}
 
 **Non-goals:** {Explicit exclusions.}
 
@@ -53,7 +55,7 @@ Use these shapes after the slice graph passes the agent's evidence audit. Keep p
 
 **Transitional-seam budget:** {Duplicate representations, generic mutations, adapters, or double opens retained; why coherent; exact removal slice. State "none" when none.}
 
-**Blast radius:** {Shared state, concurrency/ordering, interfaces/schema, failures, performance, security, dependencies. Explicitly flag untraced effects.}
+**Blast radius:** {Obligations added and removed, per the shared design-cost reference; shared state, concurrency/ordering, interfaces/schema, failures, performance, security, dependencies. Explicitly flag untraced effects.}
 
 **Artifact classification:** {Classify each material artifact as shipped behavior, required safety enforcement, verification aid, or process/traceability metadata. For any verification aid approved as a blocking maintained deliverable, state payoff, supported domain, owner, and retirement policy.}
 
@@ -67,7 +69,7 @@ Use these shapes after the slice graph passes the agent's evidence audit. Keep p
 
 **Dispatch context budget:** {Current slice contract, referenced invariants, relevant unresolved history, governing diff if needed, and why implementation plus review fits one fresh context.}
 
-**Slice decision audit:** {Strongest further-split and adjacent-merge alternatives; why each was rejected; evidence that every blocking edge is necessary.}
+**Slice decision audit:** {Strongest further-split and adjacent-merge alternatives; for a contained design, the owner's design and its outcome or rejection record; why each was rejected; evidence that every blocking edge is necessary.}
 
 **Stop conditions:** {Code evidence that invalidates the approach and requires operator review.}
 
@@ -84,7 +86,7 @@ For every criterion containing a universal quantifier, record its supported doma
 
 ## Operating Discipline
 
-Follow the shared review-loop and contract-closure baselines supplied by `$implement-architecture-slice` for every slice/PR, composed with any existing repository-specific `docs/REVIEW-LOOP.md` and `docs/CONTRACT-CLOSURE.md` overlays. {Track-specific approach stop conditions and vocabulary reminders.}
+Follow the shared review-loop and contract-closure baselines supplied by `$implement-architecture-slice` for every slice/PR, composed with any existing repository-specific `docs/REVIEW-LOOP.md` and `docs/CONTRACT-CLOSURE.md` overlays. Weigh any replacement design in a scoped re-audit with the shared design-cost reference. {Track-specific approach stop conditions and vocabulary reminders.}
 ```
 
 ## Program-overview doc skeleton

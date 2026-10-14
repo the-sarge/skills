@@ -56,7 +56,7 @@ The original `$implement-architecture-slice` invocation authorizes routine scope
 
 1. Preserve the implementation branch and stop code edits, RAS cycles, certification, and CI.
 2. Reconstruct only the relevant code and unresolved review or verification evidence. Apply the shared [contract-closure reference](../_shared/CONTRACT-CLOSURE.md) only to accepted invariant-and-owner roots involved in the stop and only when both material-risk triggers remain true.
-3. Re-run the slice gates: representation ownership, artifact classification, evidence budget, single owner, authority completeness, transitional seams, preservation, blast radius, context fit, and the strongest split/merge cases.
+3. Re-run the slice gates: representation ownership, artifact classification, evidence budget, single owner, authority completeness, transitional seams, preservation, blast radius, context fit, and the strongest split/merge cases. Weigh any replacement design with the shared [design-cost reference](../_shared/DESIGN-COST.md); ordinary execution follows the accepted plan and does not reopen settled designs.
 4. Continue only when the same child and one-PR outcome pass those gates with a central enforcement design and a finite terminating evidence plan.
    - Update the current normative plan contract in place. Put the coverage matrix and current disposition there; put trigger chronology, review/verification IDs, receipts, and superseded findings in a linked audit artifact or PR discussion.
    - Publish through the repository's authorized path and require the resulting commit to be reachable from the plan's authoritative branch before synchronizing the child issue's exact plan pointer. Do not copy the plan SHA into OmniFocus, parent, or program mirrors.

@@ -22,7 +22,7 @@ Package a grilled architecture review so implementing agents never re-derive the
 Draft one implementation-plan doc per track in `docs/adr/` using [TEMPLATES.md](TEMPLATES.md). Each plan must contain:
 
 - Grilled decisions with reasoning and verified facts anchored to `file:line`.
-- Reversed/rejected directions explicitly marked "do not do this."
+- Reversed/rejected directions explicitly marked "do not do this," each with its reason and a revisit trigger or `none: rejected on merit`, per the shared [design-cost reference](../_shared/DESIGN-COST.md).
 - Non-goals and settled ADRs/guardrails not to re-litigate.
 - Track dependencies, behavioral-preservation gates, approach-level stop conditions, artifact classifications, representation contracts, evidence budgets, and any contract-closure matrix required by the risk triggers below.
 - The slice graph from Step 2; do not finalize or commit it before the agent audit passes.
@@ -46,11 +46,11 @@ Every slice must satisfy all of these rules:
 - **Context-sized**: declare a bounded dispatch context and fit implementation, local review fixes, and verification inside it. Split again if that claim is doubtful; never require two complete historical plan versions when the current slice plus a governing diff is sufficient.
 - **Explicitly ordered**: name only genuine blocking slices. A slice with no blockers belongs on the implementation frontier.
 - **TDD-shaped**: name the failing or characterization tests written first, including restart, failure, or concurrency tests where the behavior crosses those seams, and keep their count inside the declared evidence budget.
-- **Smallest blast radius**: trace effects beyond the immediate goal across shared/global state, concurrency and ordering, public interfaces and schemas, failure modes, performance, security, and dependencies. Flag every effect not fully traced.
+- **Smallest blast radius**: trace effects beyond the immediate goal across shared/global state, concurrency and ordering, public interfaces and schemas, failure modes, performance, security, and dependencies. Flag every effect not fully traced. Weigh alternatives with the shared design-cost reference: obligations before contract changes before footprint.
 
 Apply these architecture-specific gates:
 
-- **Single-owner invariant**: after the slice, each durable fact and lifecycle transition has one mutation owner. A compatibility adapter may translate, but it must not become a second state machine.
+- **Single-owner invariant**: after the slice, each durable fact and lifecycle transition has one mutation owner. A compatibility adapter may translate, but it must not become a second state machine. Decisions stay in the module that owns the state they change, and in its execution context when that state is confined to one; signals between execution contexts carry facts, not policy.
 - **Authority-complete invariant**: do not make a persisted fact authoritative unless the same slice covers its constructors, validation, restart round trip, and every destructive or security-sensitive consumer that relies on it.
 - **Transitional-seam budget**: list every duplicate representation, generic mutation path, temporary adapter, or double-open lifetime left after the slice. Explain why the intermediate state is coherent and identify the exact blocking slice that removes it. A slice may not widen a transitional seam.
 - **Artifact classification**: apply the shared classification and blocking policy, then record each artifact and any approved maintained-aid exception in the plan.
@@ -79,9 +79,10 @@ Before committing docs, write the proposed slice graph and audit each numbered s
 - Why it fits its declared fresh-context budget.
 - Existing-work disposition when applicable: retain, rework, split, replace, or close.
 - The strongest case for splitting it further and the strongest case for merging it with an adjacent slice.
+- For a contained design, the owner's design and its comparison or rejection record, per the shared design-cost reference.
 - The evidence that its blocking edges are necessary rather than convenient ordering.
 
-Judge the graph yourself. Split when context fit, ownership, authority completeness, or blast-radius tracing is doubtful; bias toward the smaller independently green slice. Merge only when neither candidate can deliver a coherent behavior alone and the merged slice still fits one fresh context. Remove convenience-only blocking edges. Record rejected split/merge alternatives briefly in the plan so later agents do not repeat the debate.
+Judge the graph yourself. Split when context fit, ownership, authority completeness, or blast-radius tracing is doubtful; bias toward the smaller independently green slice. Merge only when neither candidate can deliver a coherent behavior alone and the merged slice still fits one fresh context. Remove convenience-only blocking edges. Record rejected split/merge alternatives briefly in the plan so later agents do not repeat the debate; each records `none: rejected on merit` unless a specific event would reopen it.
 
 Do not ask the user to judge technical granularity, ownership seams, or dependency edges. Escalate only when the audit exposes an unresolved product choice, requires authority for an irreversible external action, or proves an accepted architectural decision cannot work. Otherwise make the best decision and proceed.
 
@@ -152,6 +153,7 @@ Before finishing, verify:
 - All blocking edges are genuine, all frontier labels are correct, and no blocked work is presented as ready.
 - Parent issues, program trackers, and OmniFocus notes contain current state and pointers rather than mirrored substantive contracts, and exact code-head certification is not conflated with administrative plan or mirror state.
 - No untraced blast-radius effect is silently accepted.
+- Every rejected alternative records its reason and a revisit trigger or `none: rejected on merit`, and every contained design records the owner's design and its outcome.
 - This run launched no implementation or dispatch agent; the frontier is reported as dispatchable, not dispatched.
 
 If any check fails, return to the slice-design gate before publishing or dispatching work.
