@@ -23,6 +23,7 @@ _shared/            # protocol documents several skills compose
 | --- | --- |
 | `_shared/REVIEW-LOOP.md` | independent finding disposition, semantic finding-family classification, representation and repeated-root stops, and the bounded manual review/fix/verify loop |
 | `_shared/CONTRACT-CLOSURE.md` | representation-aware, artifact-aware, evidence-budgeted coverage arguments for materially risky accepted invariants |
+| `_shared/DESIGN-COST.md` | weighing design options by the ordering and consistency obligations they add before footprint, the owner's-design counterfactual, revisit triggers for rejected alternatives, and borrowed invariants |
 
 Repositories may overlay these with stronger rules of their own. An overlay adds
 and explicitly overrides; it does not restate.

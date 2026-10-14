@@ -39,7 +39,7 @@ Done when: the artifact URL is live and the DEVONthink record exists in the targ
 
 ## 4. Capture conventions
 
-- Create a Markdown record in the same DEVONthink group titled `Conventions observed — <repo> (<date>)`, tagged `conventions-survey`, recording per dimension (error-message grammar, panic/error boundary, naming and constructor patterns, test idioms and helper prefixes, script prologue, comment density): the dominant convention, whether it is documented or only observed, and the drift pockets that diverge from it.
+- Create a Markdown record in the same DEVONthink group titled `Conventions observed — <repo> (<date>)`, tagged `conventions-survey`, recording per dimension (error-message grammar, panic/error boundary, naming and constructor patterns, test idioms and helper prefixes, script prologue, comment density, concurrency ownership): the dominant convention, whether it is documented or only observed, and the drift pockets that diverge from it.
 - This record is the raw material for the cross-repo conventions synthesis — write it so it can be compared side-by-side with the same record from other repos.
 
 Done when: the tagged record exists and covers every dimension the cross-cutting auditor reported on.

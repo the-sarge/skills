@@ -51,6 +51,8 @@ ras improve-architecture --prompt-file ./architecture-guidance.md
 ras improve-architecture --context file:docs/prd/improve-architecture-prd.md --context file:docs/adr/0008-architecture-review-run.md
 ```
 
+Include the shared [design-cost reference](../_shared/DESIGN-COST.md) in operator guidance by default, so reviewers also look for side channels, hand-offs between execution contexts, and borrowed invariants. Combine it with any focus the user gives unless the user explicitly excludes or replaces it: resolve its absolute path from this skill's directory, write it and the user's guidance into one temporary guidance file outside the repository, and pass that file with `--prompt-file`. Its "In audits of existing code" section frames the lens as candidate analysis; the deepening-candidate contract still governs output. Do not pass it with `--context file:`, which accepts only repository files.
+
 Useful controls:
 
 ```bash
