@@ -28,7 +28,7 @@ Before grilling, inspect the highest-signal referenced files:
 
 - The candidate primary file and primary module.
 - Evidence paths listed in the canonical synthesis block.
-- Architecture record notes, usually `CONTEXT.md` and `docs/adr/*.md`. If no `docs/adr/` exists, say that architecture records may be `CONTEXT.md`, `docs/architecture.md`, or app-specific design docs.
+- Architecture record notes, usually `GLOSSARY.md` and `docs/adr/*.md`. If no `docs/adr/` exists, say that architecture records may be `GLOSSARY.md`, `docs/architecture.md`, or app-specific design docs.
 - Any dissent or correction that narrows scope.
 
 Prefer `rg`, `sed`, `nl`, and focused test file reads. If a question can be answered by inspecting code or docs, inspect first and then state the answer.
@@ -41,8 +41,8 @@ Use the `grill-with-docs` style after hydration:
 - For each question, include your recommended answer.
 - Anchor every question to the dossier: cite the candidate id, canonical rank, evidence path, architecture record note, or adjudication dissent that motivated it.
 - Challenge scope drift immediately. If adjudication narrowed the candidate, keep the grill inside that scope unless the user explicitly expands it.
-- Resolve terminology against `CONTEXT.md`; when language conflicts with the glossary, call it out.
-- Offer to update `CONTEXT.md` or create/amend an ADR only after a concrete decision crystallizes and the `grill-with-docs` ADR criteria are met.
+- Resolve terminology against `GLOSSARY.md`; when language conflicts with the glossary, call it out.
+- Offer to update `GLOSSARY.md` or create/amend an ADR only after a concrete decision crystallizes and the `grill-with-docs` ADR criteria are met.
 
 ## Output Shape
 

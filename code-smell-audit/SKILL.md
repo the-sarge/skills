@@ -15,7 +15,7 @@ The audit itself never modifies the repository. The only writes are to DEVONthin
 ## 1. Preflight
 
 - Invoke the `devonthink-cli` and `omnifocus-cli` skills. `get` both IDs: the DEVONthink item must be a group, the OmniFocus item a task. Stop and report if either fails.
-- Read the repo's agent docs (AGENTS.md / CLAUDE.md / CONTEXT.md and anything they mark authoritative) and its linter/formatter configs. Auditors judge against documented standards and must not re-report what the linters already enforce.
+- Read the repo's agent docs (AGENTS.md / CLAUDE.md / GLOSSARY.md and anything they mark authoritative) and its linter/formatter configs. Auditors judge against documented standards and must not re-report what the linters already enforce.
 - Locate tracker conventions: `docs/agents/issue-tracker.md` and `docs/agents/triage-labels.md` if present, else default to GitHub via `gh` with a `ready-for-agent` label if the repo has one.
 - **Delta check**: search the DEVONthink group for earlier audit records. If one exists, this run is a **delta**: extract the prior report's findings and carry them into every auditor prompt so each finding comes back as fixed, persisting, or new.
 
