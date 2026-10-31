@@ -179,7 +179,7 @@ def architecture_notes(cluster: dict[str, Any], canonical: dict[str, Any] | None
 
 
 def resolve_architecture_record(note: str, repo: str) -> str:
-    path_match = re.search(r"(CONTEXT\.md|docs/adr/[^\s`;]+|docs/architecture\.md)", note)
+    path_match = re.search(r"(GLOSSARY\.md|CONTEXT\.md|docs/adr/[^\s`;]+|docs/architecture\.md)", note)
     if path_match:
         return path_match.group(1)
     adr_match = re.search(r"\bADR-(\d{4})\b", note)
@@ -349,7 +349,7 @@ def render_markdown(dossier: dict[str, Any]) -> str:
     else:
         lines.append("- None recorded.")
     if not dossier["architecture_records"]["docs_adr_exists"]:
-        lines.append("- No `docs/adr/` directory detected. Architecture records may be `CONTEXT.md`, `docs/architecture.md`, or app-specific design docs.")
+        lines.append("- No `docs/adr/` directory detected. Architecture records may be `GLOSSARY.md`, `docs/architecture.md`, or app-specific design docs.")
     lines.extend(["", "## Adjudication"])
     counts = dossier["adjudication"]["counts"]
     lines.append("- Counts: " + (", ".join(f"{key}={value}" for key, value in counts.items()) or "none"))

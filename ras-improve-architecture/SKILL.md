@@ -85,7 +85,7 @@ When visual cards help a human compare candidates, generate any temporary report
 ## Safety Notes
 
 - Dirty tracked and untracked files in the caller checkout are warnings, not source input, unless passed as explicit `--context file:` overlays.
-- `CONTEXT.md` and `docs/adr/*.md` are auto-injected from `HEAD` by default; use `--no-auto-context` only when the user intentionally wants narrower or context-free review.
+- `GLOSSARY.md` and `docs/adr/*.md` are auto-injected from `HEAD` by default; use `--no-auto-context` only when the user intentionally wants narrower or context-free review.
 - Large repositories create one disposable full worktree per active reviewer round. Tell operators to estimate disk headroom as active reviewer count times repository worktree size and to tune `--agents` or `--timeout-seconds` for large repos.
 - Architecture prompts already include the deepening-candidate contract; bundled local agent skills are optional enrichment, not required for subprocess agents to produce valid output.
 
