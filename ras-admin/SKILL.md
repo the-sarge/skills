@@ -1,12 +1,12 @@
 ---
 name: ras-admin
 description: >-
-  Use when Codex needs to initialize, configure, install bundled skills, test agent adapters, clean stale RAS state, or inspect version metadata with administrative RAS commands such as `ras init`, `ras skills install`, `ras agents test`, `ras agents capabilities`, `ras cleanup stale-runs`, or `ras version`. Do not use for running reviews, verification, fixing, or implementation loops.
+  Use when Codex needs to initialize, configure, test agent adapters, clean stale RAS state, or inspect version metadata with administrative RAS commands such as `ras init`, `ras agents test`, `ras agents capabilities`, `ras cleanup stale-runs`, or `ras version`. Do not use for running reviews, verification, fixing, or implementation loops.
 ---
 
 # RAS Admin
 
-Use RAS admin commands for setup, local diagnostics, bundled skill installation, stale-state cleanup, and version checks.
+Use RAS admin commands for setup, local diagnostics, stale-state cleanup, and version checks.
 
 ## Before Running
 
@@ -21,7 +21,6 @@ Initialize repo-local RAS config and state:
 
 ```bash
 ras init
-ras init --with-agent-skills
 ```
 
 Use force flags only when intended:
@@ -33,20 +32,6 @@ ras init --data-dir .ras/data
 ```
 
 `--force` overwrites the project `.ras/config.yaml`; `--force-global` overwrites the global config. Plain `ras init` should preserve existing config.
-
-## Bundled Skills
-
-Check or install managed copies of bundled RAS skills:
-
-```bash
-ras skills install --repo --check
-ras skills install --repo
-ras skills install --global --check
-ras skills install --global
-ras skills install --global --force-replace
-```
-
-Use `--force` only when replacing drifted managed files is intended. If a global install finds a non-empty Claude skill directory, `--force` lists the contents and prompts before replacing it; use `--force-replace` only for non-interactive replacement.
 
 ## Agent Diagnostics
 
