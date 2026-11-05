@@ -46,11 +46,11 @@ Before an issue closure or ready brief relies on such a document as established,
 
 Dispatch `planit` in a fresh implementation context with the issue's verified brief. The worker writes its concrete plan before code and returns it to the orchestrator. Publishing a plan or setting `ready-for-agent` is not approval.
 
-Independently compare the plan with the delegation boundary, accepted program, current code evidence, and `planit`'s review contract. Inspect outcome and non-goals, preservation obligations, owner/representation choices, blast radius, PR boundaries, artifacts, and the finite evidence/review plan. Request specific corrections if these do not yet agree. Preserve shared-policy stops for the human; do not use repeated plan revisions to evade them.
+Independently compare the plan with the delegation boundary, accepted program, current code evidence, and `planit`'s review contract. Inspect outcome and non-goals, preservation obligations, owner/representation choices, blast radius, PR boundaries, artifacts, and the finite evidence/review plan, including each PR's intended public test seams and what they catch or miss. Request specific corrections if these do not yet agree. Preserve shared-policy stops for the human; do not use repeated plan revisions to evade them.
 
 Before implementation, persist the exact plan revision on the GitHub follow-up issue and a decision receipt containing: the originating program and human delegation source; plan comment/document revision and content digest or commit; approved outcome and PR boundary; rationale for being in scope; orchestrator identity; and the explicit outcome `approved under delegated authority`, `revise`, or `needs human decision`. Label it delegated approval, never human approval. Include the triage disclaimer if posting within the triage workflow.
 
-Resume the worker with the approval receipt and the exact approved plan. A material plan change invalidates that approval and returns for review before code resumes. A `planit` approach stop follows its human approval branch; ordinary execution fixes inside the accepted contract stay with the worker. Workers cannot approve their own plans.
+Within the delegation boundary, recorded approval of the exact plan also confirms its named public test seams for `tdd`; no second human seam confirmation is needed. Resume the worker with the approval receipt and the exact approved plan. A material plan change, including changed test seams, invalidates that approval and returns for review before tests or code resume. A `planit` approach stop follows its human approval branch; ordinary execution fixes inside the accepted contract stay with the worker. Workers cannot approve their own plans.
 
 ## Scheduling and closure
 
