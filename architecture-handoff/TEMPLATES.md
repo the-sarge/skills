@@ -65,7 +65,7 @@ Use these shapes after the slice graph passes the agent's evidence audit. Keep p
 
 **Evidence budget:** {Representative positive and materially distinct negative cases; optional one guard mutation per owner; justified platforms, repetitions, timing, hosted runs, or security-fixture cells; explicit terminating rule; one review plus at most one replacement.}
 
-**TDD and preservation evidence:** {Tests written first and focused gates detecting regressions in preserved behavior.}
+**TDD and preservation evidence:** {Accepted test seams, what each catches and misses, tests written first, and focused gates detecting regressions in preserved behavior, within the evidence budget.}
 
 **Dispatch context budget:** {Current slice contract, referenced invariants, relevant unresolved history, governing diff if needed, and why implementation plus review fits one fresh context.}
 

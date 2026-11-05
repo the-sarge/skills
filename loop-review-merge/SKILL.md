@@ -16,6 +16,6 @@ Drive a PR to merge through a review loop where **you** do the fixing and judgin
 
 When the protocol produces `stop-for-decision`, preserve the branch, record all dispositions and the review and verification history plus the precise invariant-and-owner root, and report the required design decision to the user. A `defer` or `reject` finding does not enter this branch. This merge skill does not silently widen or redesign the PR.
 
-Apply shared [contract closure](../_shared/CONTRACT-CLOSURE.md) only after the baseline assigns `fix-now`; apply the shared [approach stops](../_shared/REVIEW-LOOP.md#approach-stops) throughout.
+Apply shared [contract closure](../_shared/CONTRACT-CLOSURE.md) only after the baseline assigns `fix-now`; apply the shared [approach stops](../_shared/REVIEW-LOOP.md#approach-stops) throughout. Use the shared [difficult-failure diagnostic route](../_shared/REVIEW-LOOP.md#difficult-accepted-failures) when its conditions apply, then resume this workflow at the interrupted phase.
 
 The skill is complete when the reviewed, locally certified, and hosted-verified head is merged.

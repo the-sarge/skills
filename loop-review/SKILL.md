@@ -13,6 +13,6 @@ Read the repository's review protocol when present and compose its stronger repo
 
 When the protocol produces `stop-for-decision`, preserve the branch, record all dispositions and the review and verification history plus the precise invariant-and-owner root, and report the required design decision to the user. A `defer` or `reject` finding does not enter this branch. This review-only skill does not silently widen or redesign the PR.
 
-Apply shared [contract closure](../_shared/CONTRACT-CLOSURE.md) only after the baseline assigns `fix-now`; apply the shared [approach stops](../_shared/REVIEW-LOOP.md#approach-stops) throughout.
+Apply shared [contract closure](../_shared/CONTRACT-CLOSURE.md) only after the baseline assigns `fix-now`; apply the shared [approach stops](../_shared/REVIEW-LOOP.md#approach-stops) throughout. Use the shared [difficult-failure diagnostic route](../_shared/REVIEW-LOOP.md#difficult-accepted-failures) when its conditions apply, then resume this workflow at the interrupted phase.
 
 The skill is complete when the shared bounded review completion criterion is met. Leave certification, merge, journal, and tracking to the invoking workflow.

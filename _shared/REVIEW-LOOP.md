@@ -77,6 +77,12 @@ Low/nit policy:
 
 Finding-family policy: only after a finding is accepted as `fix-now`, translate it through `observed example → violated invariant → in-contract semantic sibling family → enforcement owner → regression evidence`. Sibling families are behaviorally distinct semantic cases, not alternate encodings accepted by an external parser. Apply the [contract-closure protocol](CONTRACT-CLOSURE.md) only when the accepted obligation has both a material failure consequence and multiple independently reachable paths or states that focused tests cannot reasonably cover. A fix is local only when the required semantic family fits the approved boundary and one central owner can enforce it. Do not strengthen the contract, enumerate syntax aliases, recursively impose closure on evidence aids, or absorb adjacent families merely because the reviewer suggested them.
 
+## Difficult accepted failures
+
+For a `fix-now` finding or an in-scope local/CI failure whose cause remains unclear after initial inspection, load the installed `diagnosing-bugs` skill and use its reproduce, minimise, hypothesise, instrument, fix, and cleanup process. Straightforward failures can be handled directly. Classify a CI failure first; an identified external infrastructure outage follows the existing rerun policy and does not require a product-code repro.
+
+Keep diagnosis inside the accepted contract, artifact classification, and evidence budget. The skill's suggested repetitions, fuzzing, or harnesses are options, not additional obligations: select only evidence admitted by that budget. If a useful repro or fix requires another seam, maintained aid, scope expansion, or unresolved authority, use the existing disposition and decision path before proceeding. `defer` and `reject` findings do not trigger diagnosis work. Preserve the precise-root history and existing approach stops, remove temporary instrumentation, and return to the interrupted preparation, RAS verification, or certification phase; diagnosis adds no fresh review round or automatic rerun.
+
 ## Approach stops
 
 Stop immediately when a finding shows a handwritten scanner attempting to claim broad coverage over an open external language, schema, or protocol without an authoritative parser, validator, or mechanically enforced canonical subset. This representation mismatch is `stop-for-decision`; do not patch the reported syntax family first.
