@@ -344,3 +344,31 @@ Merged [PR #32](https://github.com/the-sarge/skills/pull/32) as `3668f88`, addin
 
 - `ras consider` run `20261014T211252-f0663a69bc71c59d064529a2` (six reviewers; adjudication and synthesis completed) consolidated 46 findings into ten fixes. All ten were accepted after independent disposition and applied before merge. One report that auditor subagents cannot resolve the reference's relative link was deferred as unconfirmed. The revised document was not re-run through `ras consider`.
 - `git diff --check` passed, the governing shared policies showed no diff, and the live `~/.agents/skills` copies byte-match `3668f88` after the dotfiles fast-forward.
+
+---
+
+## Architecture program orchestration - 2026-11-05 15:55 EST
+
+**Main:** `f351ae4e94e1`
+**Actor:** Codex
+
+**Summary**
+
+Merged [PR #37 — Architecture program orchestration with delegated follow-up decisions](https://github.com/the-sarge/skills/pull/37) as `f351ae4e94e15c36185de00cea9f9125124d849c`.
+
+**Completed**
+
+- Added the reusable `orchestrate-architecture-program` skill, focused follow-up and worker references, UI metadata, and README discovery text. GitHub issues own program state and decisions; accepted linked plans retain substantive contracts; OmniFocus remains an optional convenience mirror with recorded repair work on failure.
+- Added a scoped `planit` exception for the authorized orchestrator to approve concrete in-scope follow-up plans. Standalone user approval and human-owned architecture, representation, publication, and approach-stop decisions remain intact.
+- Review fixes carry discovered label mappings to fresh triage workers, land triage-authored repository documents before dependent closure/readiness, and make exact-plan delegated approval confirm its named public TDD seams.
+
+**Validation**
+
+- Initial RAS review `20261105T203339-b839dade941cb2bf2c288cf1` produced two accepted fixes and two independently rejected findings. Exact-head verification at `f48423ee04c88f13b4a99ec09b4e1d81b36c6860` resolved both accepted findings with blocking projection clear and coverage 4/4.
+- Replacement review `20261105T204703-b87cb649811c2ce48d79bbce` produced one low-severity TDD seam clarification. Applied it under the shared docs-only polish exemption, with a focused walkthrough and final local certification instead of another RAS cycle. No unresolved fix-now, deferred, or stop-for-decision findings remained.
+- Both review runs attempted the unchanged four-agent panel. Claude Fable failed at process launch; Codex Astra, Codex Sol, and Claude Opus completed, along with adjudication and synthesis, satisfying the configured quorum.
+- Final head `ad51c45dfc39d2c87f3b2659d265a34bb37c02da` was certified against unchanged base `413964a3eeaf55b8689847f376290aee9fc5519d`: both skill validators, all 13 local Markdown links/anchors, YAML UI metadata, portable references, clean worktree, and `git diff --check` passed. The repository had no hosted workflows or required branch checks. Behavioral walkthroughs covered delegated and standalone approval, interrupted closure, mirror failure, external qualification, discovered labels, document landing, and test-seam confirmation.
+
+**Next**
+
+Sync the new skill and updated `planit` into the installed shared-skill distribution before first use; [PR #37](https://github.com/the-sarge/skills/pull/37) is the landed source for that synchronization.
