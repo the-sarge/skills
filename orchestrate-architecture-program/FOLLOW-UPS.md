@@ -21,7 +21,7 @@ Delegation changes who provides routine triage direction and initial in-scope pl
 2. Explicitly dispatch the installed `triage` skill with the delegation source and this reference. If it is explicit-only, use the harness's supported explicit invocation or load its installed instructions as part of this authorized dispatch; preserve its installation policy. The skill may come from another package and must not be replaced with a guessed local copy.
 3. The triage worker gathers context and returns its category/state recommendation at its normal "wait for direction" point. The orchestrator reviews it and records delegated direction on the issue, then resumes that worker. Preserve the skill's AI disclaimer on triage comments, repository label mapping, reproduction, redundancy/prior-rejection checks, and agent-brief requirements.
 4. Supply already settled answers from accepted contracts when clarification is needed. Ask the human for unresolved product preferences, unavailable facts, or an owner-only decision. Routine factual label corrections may be directed by the orchestrator; unresolved contradictory intent cannot.
-5. Apply the verified outcome. A disproved claim or new evidence returns for a revised decision rather than forcing the provisional recommendation. Mirror the resulting GitHub state under the main skill's mirror policy.
+5. Apply the verified outcome. A disproved claim or new evidence returns for a revised decision rather than forcing the provisional recommendation. If the outcome depends on repository documents produced during triage, complete the publication step below before marking it ready or closing it. Mirror the resulting GitHub state under the main skill's mirror policy.
 
 | Final state | Scheduling consequence |
 | --- | --- |
@@ -33,6 +33,14 @@ Delegation changes who provides routine triage direction and initial in-scope pl
 | Adjacent useful work outside delegation | Retain as explicitly out-of-scope backlog or request scope authority; do not launch it |
 
 Use repository mappings for these canonical states. Never triage external PRs as requests in a repository whose issue policy excludes them.
+
+## Triage document publication
+
+Triage may update `GLOSSARY.md`, ADRs, or `.out-of-scope/` records. Recording a rejection already settled by an accepted contract remains within delegated triage; a new product rejection still needs the human decision required by the delegation boundary.
+
+Use the worker's dedicated branch/worktree and the repository's authorized documentation workflow, or its composed review/validation/merge protocol when there is no separate documentation route. Obtain the coordinator's serialized merge turn. This uses existing gates; it does not add a new approval or review gate.
+
+Before an issue closure or ready brief relies on such a document as established, verify the resulting commit is reachable from the authoritative branch and cite the durable document link. A local file, pushed branch, or open documentation PR is pending publication. Include the document link and applicable review, validation, and merge evidence in the worker receipt. On interruption, record document publication as pending closure and resume that stage; continue independent work while it remains pending.
 
 ## Plan approval
 
