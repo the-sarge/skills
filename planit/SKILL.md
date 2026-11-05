@@ -5,7 +5,9 @@ description: Produce an implementation plan for standalone or unplanned work and
 
 # planit
 
-Produce an implementation plan, get the user's approval, then drive it to merge one PR at a time through a review loop where **you** do the fixing and judging and RAS is used **only** to review and verify.
+Produce an implementation plan, get approval from the user or an explicitly authorized program orchestrator, then drive it to merge one PR at a time through a review loop where **you** do the fixing and judging and RAS is used **only** to review and verify.
+
+The user is the default approval owner. For an in-scope follow-up explicitly dispatched by `orchestrate-architecture-program`, read its [delegated-decision policy](../orchestrate-architecture-program/FOLLOW-UPS.md). Carry the originating human delegation, return the concrete plan to that orchestrator, and wait for its recorded approval of the exact plan revision before implementation. An issue label, worker assertion, or generic request to act autonomously is not this delegation. The orchestration skill's optional-mirror policy also governs OmniFocus closure for that run. Standalone use and the human approval requirement at an approach stop remain unchanged.
 
 Before planning, inspect any supplied issue. When given an OmniFocus task, use `omnifocus-cli` to resolve and inspect its linked issue. When the issue contains `<!-- architecture-handoff-slice:v1 -->`, invoke `$implement-architecture-slice`; its committed plan is already the approved design and its execution preflight replaces this planning stage. Read the repository's review protocol when present and compose its stronger repository-specific rules with the shared [review-loop baseline](../_shared/REVIEW-LOOP.md).
 
@@ -13,7 +15,7 @@ Before planning, inspect any supplied issue. When given an OmniFocus task, use `
 
 ### 1. Plan
 
-- Write the plan, then present it to the user for approval **before writing any code**.
+- Write the plan, then present it to the approval owner defined above **before writing any code**. For delegated approval, retain the GitHub decision receipt and approved plan revision.
 - Implementation happens in a branch, divided into multiple PRs if needed, using TDD where appropriate.
 - Give each PR an explicit review contract: the current outcome, acceptance criteria, existing behavior on the changed surface that must be preserved, non-goals, approved blast radius, artifact classifications, representation domain and owner, guarantee level, terminating evidence plan, and review-round budget. Treat that contract as both the minimum to deliver and the ceiling a review finding cannot silently expand.
 - Classify every material artifact through the shared contract-closure policy and record any explicit approval for a verification aid to block shipped work.

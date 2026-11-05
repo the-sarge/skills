@@ -81,6 +81,8 @@ programs; `implement-architecture-slice` executes one of its child slices.
 `devonthink-cli`, and `omnioutliner-cli` cover journaling, CI policy, and local
 tool access.
 
+`orchestrate-architecture-program` coordinates an existing audited program through fresh workers, delegates routine follow-up triage and approval of in-scope `planit` plans, and keeps GitHub issues authoritative. It uses `implement-architecture-slice` for audited children and a separately installed `triage` skill for follow-ups. Existing or requested OmniFocus mirrors are conveniences; failed synchronization is recorded for repair without blocking independent GitHub work.
+
 ## Scripts
 
 Skills invoke their own helpers as `<skill-base-dir>/scripts/<name>`, resolved at
