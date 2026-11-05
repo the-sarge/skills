@@ -1,0 +1,4 @@
+interface:
+  display_name: "Orchestrate Architecture Program"
+  short_description: "Coordinate slices and delegated follow-up decisions"
+  default_prompt: "Use $orchestrate-architecture-program to run this audited GitHub program, delegate in-scope follow-up triage and plan approval, and reconcile its existing OmniFocus mirror."
