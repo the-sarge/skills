@@ -39,6 +39,8 @@ Use these routes, checking the issue's marker before its labels:
 | Parent/tracker with no accepted child contracts | Prepare the missing-contract report and recommend `architecture-handoff`; do not treat the parent as one implementation ticket |
 | Work requiring a reserved human decision | Record the decision needed and continue independent work |
 
+When several tickets need the same discovery, consider [shared exploration](WORKERS.md#shared-exploration) before or alongside dispatch. Skip it when accepted plans and existing context already suffice; independent ready work can proceed while exploration runs.
+
 Claim only eligible, unowned work and persist the assignment before implementation. Re-read the live issue and claim immediately before dispatch; if another agent owns it, coordinate or select another item. Resume an owned worker for its current issue; use a fresh context for a different issue. Supply the bounded [worker assignment](WORKERS.md), including the original human delegation and the exact skill to read.
 
 Use subagents by default. Separate user-owned chats require an explicit human request and messaging authorization; an orchestrator message alone does not grant a worker permission to message another chat. With no delegation capability, report that limitation and offer sequential execution rather than silently substituting it.
@@ -54,6 +56,8 @@ Stay active while owned workers run. Use the harness's result/wait controls and 
 Workers own their complete execution workflow, including review, validation, merge, journal, and issue updates. The coordinator owns the parent/tracker and scheduling. Reconcile overlapping administrative updates serially; product PRs retain ownership of committed frontier/completion changes required by their contracts.
 
 Verify each [completion receipt](WORKERS.md#completion-receipt) against GitHub and the relevant repository. Distinguish code merged, journal pending, tracker pending, and fully reconciled. Complete remaining closure work without repeating an already merged implementation. Only then advance successors whose actual dependencies are satisfied; optional mirror repair is handled separately below.
+
+After verified closure, perform [worktree cleanup](WORKERS.md#worktree-cleanup) for released worker worktrees and record what was removed, archived, or retained. Preserve work needed for recovery or remaining consumers.
 
 Revalidate deferred findings against the merged head before filing or scheduling follow-ups. Read [FOLLOW-UPS.md](FOLLOW-UPS.md) for triage, delegated approval, scheduling, and recursive follow-up handling. New findings do not automatically enlarge the program or block its successors.
 
@@ -73,6 +77,6 @@ After interruption, reconstruct state from GitHub and verify live worker, PR, he
 
 Escalate only affected work when product intent, representation/authority, adjacent slice scope, an accepted PR boundary, release/publication authority, external evidence, or an explicit owner-only decision is unresolved. Preserve useful branches and receipts. Same-child scoped re-audits remain with `implement-architecture-slice` when that skill authorizes them; a true architecture-handoff stop stays a human decision. Routine triage and in-scope follow-up plan approval follow the delegated path.
 
-When authorized work is exhausted, reconcile the parent with fulfilled acceptance criteria and every child's disposition. Required external qualification or a conditional outcome awaiting evidence remains pending. Authorized in-scope follow-ups must be completed or explicitly dispositioned; unrelated improvements do not make the program endless. Report engineering completion separately from any remaining mirror repair.
+When authorized work is exhausted, reconcile the parent with fulfilled acceptance criteria and every child's disposition. Required external qualification or a conditional outcome awaiting evidence remains pending. Authorized in-scope follow-ups must be completed or explicitly dispositioned; unrelated improvements do not make the program endless. Reconcile every recorded worker worktree under the cleanup procedure, including on a blocked stop. Report engineering completion separately from retained worktrees, pending cleanup, and remaining mirror repair.
 
 If only blocked work remains, persist exact resume conditions and report the smallest concrete decision or external event needed, with a recommendation. Do not mark incomplete work complete, claim an active watcher after the session ends, or imply automatic restart recovery. No scheduled automation is needed to watch this program.
