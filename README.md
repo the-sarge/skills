@@ -83,6 +83,8 @@ tool access.
 
 `orchestrate-architecture-program` coordinates an existing audited program through fresh workers, delegates routine follow-up triage and approval of in-scope `planit` plans, and keeps GitHub issues authoritative. It uses `implement-architecture-slice` for audited children and a separately installed `triage` skill for follow-ups. Existing or requested OmniFocus mirrors are conveniences; failed synchronization is recorded for repair without blocking independent GitHub work.
 
+`redesign-pipeline` drives whole-pipeline diagnosis and iterative redesign against end-to-end targets, with a reusable experiment template and explicit qualification and delivery criteria.
+
 ## Scripts
 
 Skills invoke their own helpers as `<skill-base-dir>/scripts/<name>`, resolved at
