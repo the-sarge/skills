@@ -372,3 +372,29 @@ Merged [PR #37 — Architecture program orchestration with delegated follow-up d
 **Next**
 
 Sync the new skill and updated `planit` into the installed shared-skill distribution before first use; [PR #37](https://github.com/the-sarge/skills/pull/37) is the landed source for that synchronization.
+
+---
+
+## Shared exploration and worker worktree cleanup - 2026-11-05 20:19 EST
+
+**Main:** `4e0a407229a4`
+**Actor:** Codex
+
+**Summary**
+
+Merged [PR #39 — Shared exploration and worktree cleanup](https://github.com/the-sarge/skills/pull/39) as `4e0a407229a46bfc8dd5d1e108e75b0d324c5a84`.
+
+**Completed**
+
+- Added optional, bounded exploration at pinned revisions. Accessible shared notes remain advisory; workers refresh relevant findings against their current source and accepted contracts, and independent ready work can proceed during discovery.
+- Added coordinator-owned cleanup of program-created worker worktrees after verified closure. The procedure checks release, ownership, delivered work, journal/document publication, ignored artifacts, and remaining consumers; it archives managed worktrees or removes eligible unmanaged worktrees without force, preserves branch refs, and records retained work separately from engineering completion.
+
+**Validation**
+
+- Full configured RAS panel completed initial review and adjudication in run `20261106T010731-43f4ce0b08012d86635e039a`: Codex Astra, Codex Sol, Claude Fable, and Claude Opus, followed by synthesis. All six clusters were independently rejected as already handled or unsupported; no required fixes, deferred issues, or decision stops remained. The [PR #39 review receipt](https://github.com/the-sarge/skills/pull/39#issuecomment-6674036852) records the evidence and dispositions. An earlier attempt failed before reviewer startup because its scratch-worktree parent was missing; creating the directory resolved that infrastructure failure with the panel unchanged.
+- Exact reviewed head `14392eab676e5bd7235476455f82fd42f20c23b0` passed local certification against base `ea5e9f296165374010d09f17923108a1aa6252dc`: two skill validators, 19 local Markdown links/anchors, UI metadata, portability, clean worktree, and `git diff --check`. The base remained unchanged at merge. The repository had no hosted CI workflows or required checks.
+- An independent simulated forward test covered stale and cross-host discovery notes, independent dispatch, six worktree states, and a protected managed-archive refusal. No live worktree deletion experiment was performed.
+
+**Next**
+
+Sync the updated orchestrator into the installed shared-skill distribution before use; [PR #39](https://github.com/the-sarge/skills/pull/39) is the landed source for these additions.
