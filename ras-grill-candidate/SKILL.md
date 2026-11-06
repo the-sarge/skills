@@ -35,14 +35,14 @@ Prefer `rg`, `sed`, `nl`, and focused test file reads. If a question can be answ
 
 ## Grilling Workflow
 
-Use the `grill-with-docs` style after hydration:
+After hydration, load `grilling` for its design-tree and frontier method and `domain-modeling` for terminology and ADR criteria. Apply these local composition rules: ask one frontier question at a time rather than batching the frontier, and keep glossary/ADR changes proposed until the user authorizes writing them. Loading either skill does not authorize documentation edits or implementation:
 
 - Ask one question at a time and wait for the user's answer.
-- For each question, include your recommended answer.
+- For each question, include your recommended answer and phrase the question so "yes" accepts it.
 - Anchor every question to the dossier: cite the candidate id, canonical rank, evidence path, architecture record note, or adjudication dissent that motivated it.
 - Challenge scope drift immediately. If adjudication narrowed the candidate, keep the grill inside that scope unless the user explicitly expands it.
 - Resolve terminology against `GLOSSARY.md`; when language conflicts with the glossary, call it out.
-- Offer to update `GLOSSARY.md` or create/amend an ADR only after a concrete decision crystallizes and the `grill-with-docs` ADR criteria are met.
+- Offer to update `GLOSSARY.md` or create/amend an ADR only after a concrete decision crystallizes and the `domain-modeling` ADR criteria are met; write only after the user explicitly authorizes the documentation change.
 
 ## Output Shape
 
@@ -67,7 +67,7 @@ When the grilling session has resolved the candidate scope, success criteria, se
 - Proposed implementation slices and tests at a high level.
 - Remaining risks or open questions.
 
-Then ask whether to use `planit` to produce the implementation plan. If the user agrees, hand off to `planit` with the hydrated dossier and resolved grilling decisions as input. Do not start `planit` automatically after an arbitrary answer; only offer it when the candidate is genuinely ready to plan.
+Once the user confirms the resolved understanding, recommend the route that fits the work: `planit` for standalone work, or an explicit `$architecture-handoff` invocation for an architecture program requiring audited slices and program tracking. Supply the hydrated dossier and resolved decisions to the chosen route. Start `planit` only when the user agrees; `architecture-handoff` retains its explicit-invocation requirement. Existing marked child issues route to `implement-architecture-slice` under their accepted contracts. Report the recommendation without automatically starting implementation or dispatching an agent.
 
 ## Safety
 
