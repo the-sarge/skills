@@ -21,14 +21,46 @@ DEVONthink databases. Prefer `~/.local/bin/devonthink`; fall back to
 - Capture and mutation commands modify live data: `create-*`, `import-file`,
   `index-file`, `annotations summarize`, `annotations set`, `annotations clear`,
   `reminders add`, `reminders update`, `reminders remove`, `rename`, `move`, `tags add`,
-  `tags remove`, `trash`, `groups create|rename|move|trash`, and
+  `tags remove`, `trash`, `content set-markdown`, `content set-plain-text`,
+  `content set-source`, `groups create|rename|move|trash`, and
   `smart-groups create|rename|move|trash|update`.
 - Trash is soft delete only and still requires `--confirm UUID`. Hard delete
   and empty-trash are not CLI or MCP surfaces.
 - `index-file` leaves the file on disk and requires `--confirm-indexed` to
   match the cleaned absolute path.
-- There is no content overwrite command and no blind full-tag replacement
-  command. Use `tags add` and `tags remove` only after reading current tags.
+- There is no generic content overwrite command and no blind full-tag
+  replacement command. Use `tags add` and `tags remove` only after reading
+  current tags.
+- `content info UUID --json` reports a record's content formats, their sizes and
+  SHA-256 hashes, and whether each content write would be accepted. Take the
+  precondition hash from it; do not hash `read` output, which may return a
+  different representation than the write compares.
+- `content export UUID --format source|plain-text|markdown` returns one format
+  inline. It is the only way to retrieve HTML markup: `read` reports HTML as
+  `text` and strips it. Use `--json | jq -j '.content'` for a byte-exact round
+  trip; human output appends a trailing newline the way `read` does.
+- Content reads are capped at 512 KiB per format and fail closed above it. They
+  never truncate.
+- Content writes are per format and there is no generic setter:
+  `content set-markdown UUID --if-current-sha256 HASH` for markdown records,
+  `content set-plain-text UUID --if-current-sha256 HASH` for txt records, and
+  `content set-source UUID --if-current-sha256 HASH` for HTML documents and
+  formatted notes. Replacement content comes from stdin; `set-plain-text` and
+  `set-source` also accept `--text` or `--text-file`, but not both. Check
+  `.write_eligibility` in `content info` first: every other record type is
+  refused with a reason, and three of those reasons name a specific hazard.
+  `sets_searchable_text` means plain text on that type is the record's
+  searchable or transcribed text rather than a document body, so writing it
+  would destroy search data. `bookmark_source_is_urls` means that record's
+  source property is its URLs, so a source write would change where the bookmark
+  points. `stored_representation_not_source` means a web archive or paginated
+  PDF stores something a plain source overwrite does not describe.
+- Never edit the `file_path` of an **imported** record. It lives inside the
+  database package, and editing it writes behind DEVONthink's back. An
+  **indexed** record is the exception: its `file_path` is a user-owned file on
+  disk that DEVONthink only references, so edit it directly when you have
+  filesystem access and the user explicitly asked for that file edit. Check
+  `indexed` before deciding.
 - If a command returns `partial_update`, stop and inspect the returned
   `details`; fetch/search the affected record, group, or smart group before
   retrying.
@@ -133,14 +165,19 @@ suggestions. `compare` and `see-also` return similar records.
 
 ## Capture
 
-Capture commands require an explicit writable destination group UUID and create
-new records only.
+Capture commands require exactly one destination: `--group GROUP_UUID` or
+`--inbox` (global Inbox). They create new records only.
 
 ```sh
 printf '# Notes\n' | ~/.local/bin/devonthink create-markdown \
   --title "Meeting notes" \
   --group GROUP_UUID \
   --tag meeting \
+  --json
+
+printf '# Unsorted\n' | ~/.local/bin/devonthink create-markdown \
+  --title "File later" \
+  --inbox \
   --json
 
 ~/.local/bin/devonthink create-url "https://example.com/article" \
@@ -166,6 +203,8 @@ printf '# Notes\n' | ~/.local/bin/devonthink create-markdown \
   --group GROUP_UUID \
   --json
 
+~/.local/bin/devonthink import-file ./report.html --inbox --json
+
 ~/.local/bin/devonthink index-file ./external.pdf \
   --group GROUP_UUID \
   --confirm-indexed "$(pwd)/external.pdf" \
@@ -173,7 +212,15 @@ printf '# Notes\n' | ~/.local/bin/devonthink create-markdown \
 ```
 
 Repeat `--tag` for literal tags. Use `--tags "a,b"` for comma-split tags.
-Markdown stdin is capped at 512 KiB.
+Markdown stdin is capped at 512 KiB. Do not pass an Inbox UUID through
+`--group`; use `--inbox` for the application-level global Inbox database
+(`inbox` property → writable root group). Do not treat application
+`incoming group` or a database Inbox as the same selector.
+
+If capture returns `partial_update` for an `--inbox` destination, executor
+timeouts may include `details.inbox: true` with an empty `details.group`.
+JXA-originated partial updates usually include the resolved Inbox UUID in
+`details.group`.
 
 If capture returns `partial_update`, the record may already exist. Details may
 include `created_uuid`, `group`, `title`, `phase`, redacted `url`,
