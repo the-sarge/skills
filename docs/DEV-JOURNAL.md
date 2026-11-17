@@ -398,3 +398,48 @@ Merged [PR #39 — Shared exploration and worktree cleanup](https://github.com/t
 **Next**
 
 Sync the updated orchestrator into the installed shared-skill distribution before use; [PR #39](https://github.com/the-sarge/skills/pull/39) is the landed source for these additions.
+
+---
+
+## Legacy journal hold release prepared - 2026-11-17 02:40 EST
+
+**Main:** `6f30f29558f9`
+**Actor:** Claude
+
+**Summary**
+
+Merged [PR #42 — Reviewed legacy hold release of append-dev-journal](https://github.com/the-sarge/skills/pull/42) as `6f30f29558f9b70e320b74efd63fc10640ac3b43`. This delivers journal-migration slice S1 ([the-sarge/dev-journal#100](https://github.com/the-sarge/dev-journal/issues/100)) under plan commit `5e98cfce511d95a2bc2f33fc7c3a8f31779b4e7f`.
+
+**Completed**
+
+- Added `_releases/legacy-hold/append-dev-journal/`. It is a self-contained skill that keeps the `append-dev-journal` name, and its instructions:
+  - pause both Markdown and hosted journal writes, and rule out a manual-append fallback;
+  - keep each account's inputs, taking the remote from the account repository and authoring a factual body first when none exists;
+  - preserve the account through a confirmed owner draft (`dev-journal agent --profile … operation prepare` plus an exactly matching `operation show`), or otherwise through unconfirmed external retention with host, paths and SHA-256;
+  - report journal-pending, naming the foreground cutover coordinator as owner.
+- Its `scripts/dev_journal.py` stub refuses every cached legacy command with exit 75. It opens no file, repository or lock, and prints the same directions.
+- `README.md` documents `_releases/`, and its install-everything loop skips that directory.
+
+**Decisions**
+
+- The hold ships inert at a distinct path. Merging and pulling leave every installed skill unchanged, because installation uses explicit per-skill symlinks and nothing links `_releases/`.
+- Installing the hold remains S12's separately authorized live action, per the [cutover plan](https://github.com/the-sarge/dev-journal/blob/5e98cfce511d95a2bc2f33fc7c3a8f31779b4e7f/docs/adr/2026-11-16-journal-skills-cutover-plan.md#slice-s1--prepare-the-reviewed-legacy-hold-release).
+
+**Validation**
+
+- Review:
+  - The preparation pass (Standards/Spec) led to four fixes.
+  - Initial RAS review `20261117T071157-68a396250548327507e107c8` produced four accepted fixes (C-001 to C-004). Exact-head verification at `6963b564eff60e49bfbe00f29838c901c549e20d` covered 7/7 clusters with the blocking projection clear.
+  - Replacement review `20261117T072422-b0a119329d67acad21d42912` had no Fix First or Follow Up items.
+  - The [PR #42 review receipt](https://github.com/the-sarge/skills/pull/42#issuecomment-6941891704) records the dispositions.
+- Local certification at `6963b564eff60e49bfbe00f29838c901c549e20d`, against unchanged base `03f880801bc7b4760d18b06197c13c21d2764814`:
+  - The five named cases passed.
+  - The inert check passed: 28 installed targets, none changed, and the live `append-dev-journal` blobs are identical.
+  - Frontmatter validation passed, and `git diff --check` and the worktree were clean.
+- The repository has no hosted workflows or rulesets.
+
+**Next**
+
+- Do not sync `_releases/` into the installed distribution. The hold is installed only through S12's authorized transition.
+- The S10/S12 installation inventory must also fence callers that cached the main checkout's physical `append-dev-journal/scripts/dev_journal.py` path.
+- [the-sarge/dev-journal#112](https://github.com/the-sarge/dev-journal/issues/112) is the live program view.
