@@ -198,7 +198,7 @@ Dispatch: $implement-architecture-slice
 Plan: docs/adr/{date}-{track}-plan.md#{slice-anchor}
 Status: {ready/blocked/in progress/done}
 Blocked by: {issues or none}
-Per slice: review loop, merge, append-dev-journal, complete this task.
+Per slice: review loop, merge, dev-journal completion account, complete this task.
 ```
 
 Program-parent note:
