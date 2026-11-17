@@ -87,9 +87,7 @@ operation is not yet clear. The rest map to one RAS operation each:
 `architecture-handoff` packages reviewed architecture candidates into dispatchable
 programs; `implement-architecture-slice` executes one of its child slices.
 `loop-review` and `loop-review-merge` run a PR through the review loop on its own.
-`append-dev-journal`, `standardize-github-ci`, `omnifocus-cli`,
-`devonthink-cli`, and `omnioutliner-cli` cover journaling, CI policy, and local
-tool access.
+`dev-journal` writes, reads, and amends hosted development-journal entries; `append-dev-journal` is its compatibility name for older journal steps and writes no Markdown journal. `standardize-github-ci`, `omnifocus-cli`, `devonthink-cli`, and `omnioutliner-cli` cover CI policy and local tool access.
 
 `orchestrate-architecture-program` coordinates an existing audited program through fresh workers, delegates routine follow-up triage and approval of in-scope `planit` plans, and keeps GitHub issues authoritative. It uses `implement-architecture-slice` for audited children and a separately installed `triage` skill for follow-ups. Existing or requested OmniFocus mirrors are conveniences; failed synchronization is recorded for repair without blocking independent GitHub work.
 

@@ -15,7 +15,7 @@ This shared baseline owns finding disposition, finding-family classification, pr
 4. Push the final candidate, run slice-specific stress checks, and run the repository's local exact-head certification.
 5. Mark the PR ready (`gh pr ready`) so the required `ci-*` jobs run on that same head, then wait until the latest `ci` run started after marking the PR ready (or by a later push) on the exact live head has completed with conclusion `success` and every `ci-*` job in it reports `success` rather than `skipped` (`gh run list --workflow ci.yml --commit <head> --json databaseId,createdAt,status,conclusion`, then `gh run view <id> --json jobs`); see [hosted CI](#exact-head-local-certification-and-hosted-ci).
 6. Merge that exact head with `gh pr merge --squash --match-head-commit <head>`.
-7. **Only after that merge is on the default branch**, run `append-dev-journal` without RAS. **NEVER start `append-dev-journal` before the main work has merged.**
+7. **Only after that merge is on the default branch**, record the completion account with the [`dev-journal`](../dev-journal/SKILL.md) skill without RAS. **NEVER draft or reserve the journal account before the main work has merged.** Journal closure is complete only with an accepted hosted receipt and readback; otherwise report it journal-pending with its operation or retention reference and named resume owner, as that skill directs.
 8. Revalidate every pending `defer` against the merged head, then update OmniFocus: complete the relevant task and file the surviving follow-ups. See [deferred-finding revalidation](#deferred-finding-revalidation).
 
 ## Code-review preparation pass

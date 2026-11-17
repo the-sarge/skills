@@ -55,7 +55,7 @@ Stay active while owned workers run. Use the harness's result/wait controls and 
 
 Workers own their complete execution workflow, including review, validation, merge, journal, and issue updates. The coordinator owns the parent/tracker and scheduling. Reconcile overlapping administrative updates serially; product PRs retain ownership of committed frontier/completion changes required by their contracts.
 
-Verify each [completion receipt](WORKERS.md#completion-receipt) against GitHub and the relevant repository. Distinguish code merged, journal pending, tracker pending, and fully reconciled. Complete remaining closure work without repeating an already merged implementation. Only then advance successors whose actual dependencies are satisfied; optional mirror repair is handled separately below.
+Verify each [completion receipt](WORKERS.md#completion-receipt) against GitHub and the relevant repository. Distinguish code merged, journal pending, tracker pending, and fully reconciled. Journal closure is verified by hosted acceptance and readback through the [`dev-journal`](../dev-journal/SKILL.md) skill, not by a journal commit or PR; a journal-pending account keeps its operation or retention reference and named resume owner in the coordination record. Complete remaining closure work without repeating an already merged implementation. Only then advance successors whose actual dependencies are satisfied; optional mirror repair is handled separately below.
 
 After verified closure, perform [worktree cleanup](WORKERS.md#worktree-cleanup) for released worker worktrees and record what was removed, archived, or retained. Preserve work needed for recovery or remaining consumers.
 
@@ -73,7 +73,7 @@ On unavailable OmniFocus or a failed/partial update, record the affected issue, 
 
 ## Resume, decisions, and completion
 
-After interruption, reconstruct state from GitHub and verify live worker, PR, head/base, journal, and mirror state. Treat recorded worker IDs as hints until checked. Reuse completed work and accepted approvals only if their exact scope and plan revision still match; an interrupted worker does not by itself justify redispatch. Resolve ownership before replacing it.
+After interruption, reconstruct state from GitHub and verify live worker, PR, head/base, journal, and mirror state. Check a journal account by its hosted entry or retained operation (`operation show`), and resume a pending one only through its named owner and that same operation; never prepare a second account for it. Treat recorded worker IDs as hints until checked. Reuse completed work and accepted approvals only if their exact scope and plan revision still match; an interrupted worker does not by itself justify redispatch. Resolve ownership before replacing it.
 
 Escalate only affected work when product intent, representation/authority, adjacent slice scope, an accepted PR boundary, release/publication authority, external evidence, or an explicit owner-only decision is unresolved. Preserve useful branches and receipts. Same-child scoped re-audits remain with `implement-architecture-slice` when that skill authorizes them; a true architecture-handoff stop stays a human decision. Routine triage and in-scope follow-up plan approval follow the delegated path.
 

@@ -122,7 +122,7 @@ Use the omnifocus-cli skill under the user's parent task:
 - Use `set-group-type --sequential` only for a genuinely linear track. Preserve parallel-safe work; do not invent ordering that is absent from the slice graph.
 - Prefix blocked slice titles with `BLOCKED by ...`; notes contain stable identity, current state, blockers, child and parent issue pointers, the dispatch skill, and the normative plan pointer. Do not copy the contract, audit narrative, or exact plan SHA into task-manager mirrors.
 - Track notes contain the parent issue and plan pointers, current state, dependency warnings, and slice count.
-- Update the program-parent note with the program index, tracking issue, current frontier, and per-slice ritual: review loop → merge → append-dev-journal → complete slice task.
+- Update the program-parent note with the program index, tracking issue, current frontier, and per-slice ritual: review loop → merge → dev-journal completion account → complete slice task.
 
 ## Step 6 — Report; do not dispatch
 

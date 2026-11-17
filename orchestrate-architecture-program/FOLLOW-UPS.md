@@ -58,4 +58,4 @@ Classify impact before changing dependencies: required before a named successor,
 
 Prioritize genuine blockers and then ready work without starving the accepted program for optional improvements. Apply the same scope test to follow-ups produced by follow-ups; no automatic recursive scope growth. Respect existing evidence/review budgets rather than adding a universal follow-up count or age limit.
 
-Verify the worker's merge/journal/issue receipt, then reconcile the parent's follow-up disposition and enabled mirrors. Explicit deferral needs a reason and any real reopen condition; it is not a way to declare an unmet accepted obligation complete.
+Verify the worker's merge, journal closure (hosted acceptance or a recorded journal-pending account), and issue receipt, then reconcile the parent's follow-up disposition and enabled mirrors. Explicit deferral needs a reason and any real reopen condition; it is not a way to declare an unmet accepted obligation complete.

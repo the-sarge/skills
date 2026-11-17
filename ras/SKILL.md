@@ -42,7 +42,7 @@ If the user explicitly asks for a complete mutating loop, use the manual `ras-re
 
 For "what is the status of this project?" or "where are we?":
 
-1. Read the project docs that define current intent, usually `GLOSSARY.md`, `README.md`, `SPEC.md`, `docs/DEV-JOURNAL.md`, and PRDs under `docs/prd/`.
+1. Read the project docs that define current intent, usually `GLOSSARY.md`, `README.md`, `SPEC.md`, and PRDs under `docs/prd/`. For journal history, read the hosted journal completely through the [`dev-journal`](../dev-journal/SKILL.md) skill; a legacy `DEV-JOURNAL.md` is only an explicitly historical source.
 2. Inspect local repository state with `git status --short --branch` and recent history with `git log --oneline --decorate -n 20`.
 3. Check GitHub issue and PR state with `gh issue list` and `gh pr list` when the repository uses GitHub.
 4. Check CI/release state when relevant with `gh run list`, `gh repo view`, and release metadata.
