@@ -40,8 +40,9 @@ git clone git@github.com:the-sarge/skills.git ~/code/github.com/the-sarge/skills
 # individual skills
 ln -s ~/code/github.com/the-sarge/skills/planit ~/.claude/skills/planit
 
-# or everything, including _shared
+# or everything, including _shared but not _releases
 for d in ~/code/github.com/the-sarge/skills/*/; do
+  [ "$(basename "$d")" = _releases ] && continue
   ln -s "$d" ~/.claude/skills/"$(basename "$d")"
 done
 ```
@@ -53,7 +54,7 @@ protocol it was supposed to compose.
 
 ## Releases
 
-`_releases/` holds reviewed installation states that ship beside, not in place of, the live skills. Nothing links them, so merging or pulling one leaves every installed skill unchanged. Each `_releases/<state>/<skill>/` directory is a complete, self-contained skill that keeps its live skill's name; installing one is an explicit link or copy change by whoever owns that transition.
+`_releases/` holds reviewed installation states that ship beside, not in place of, the live skills. Installation never links `_releases/` (the install loop above skips it), so merging or pulling one leaves every installed skill unchanged. Each `_releases/<state>/<skill>/` directory is a complete, self-contained skill that keeps its live skill's name; installing one is an explicit link or copy change by whoever owns that transition.
 
 | State | Contents |
 | --- | --- |
