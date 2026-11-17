@@ -63,10 +63,10 @@ If apply is refused because dispatch is held, or it ends in any state other than
 
 ### Changed authored intent
 
-When prepare reports `conflict` because the obligation already retains different authored intent, the submission owner keeps both: the retained draft and your content as a held proposal. Do not prepare another account, and do not delete either version. Inspect both with `operation show OPERATION_ID`, then resolve explicitly, following the instruction the conflict printed:
+When prepare reports `conflict` because the obligation already retains different authored intent, the submission owner keeps both: the retained draft and your content as a held proposal. Do not prepare another account, and do not delete either version. Inspect both with `operation show OPERATION_ID --json`: `revision` is the draft's current revision, `intent` is the retained draft, and `held_proposals` lists each proposal's `intent` in order (bodies are base64 in `body_base64`). Then resolve explicitly, following the instruction the conflict printed:
 
-- If you own the account and the new content is a deliberate correction of an unbound draft, run `operation revise OPERATION_ID --expected-revision N`, with `N` the revision `operation show` reported, passing the content to keep (`--title` and `--file`): the proposal's to adopt it, or the current content's to keep the draft as it is.
-- If an attempt is already bound or settled, use `operation resolve OPERATION_ID --expected-attempt N --proposal P --reason "REASON"` only after `operation show` reports that attempt authoritatively settled.
+- If you own the account and the new content is a deliberate correction of an unbound draft, run `operation revise OPERATION_ID --expected-revision N` with `N` that revision. Revise replaces the whole intent, so pass every field of the version you keep, taken from its JSON: exactly one repository selection (`--repo REPOSITORY_ID` or each `--remote`), `--title`, the decoded body as `--file`, `--actor` for its attribution, `--metadata` with its metadata as a JSON file, and each `--link`. An omitted field other than the journal date is dropped. Keep the proposal's fields to adopt it, or reproduce the current intent exactly to keep the draft; an exact reproduction disposes the proposals without a new revision.
+- If an attempt is already bound or settled, use `operation resolve OPERATION_ID --expected-attempt N --proposal P --reason "REASON"` only after `operation show` reports that attempt authoritatively settled. `N` is the number of attempts shown, and `P` is the proposal's 1-based position in `held_proposals`, or 0 to rebind the current intent.
 - If you are not the account's owner, or the right content is unclear, leave both versions as they are and report the conflict, with its operation ID, to the owner as journal-pending.
 
 ### No writer profile
@@ -109,7 +109,7 @@ Results are paged. A complete answer requires following each page's `Next cursor
 
 Accepted originals are immutable. Change what an entry says only through a deliberate amendment, and only when you have a reason to: a `correction` of the original, an `addendum`, or a `comment`. Never write a new account to replace an old one.
 
-1. Run `history ENTRY_ID` and take the current revision's `revision_id`, an opaque token.
+1. Run `read ENTRY_ID` and take its `Revision token:` (`revision_token` with `--json`), an opaque token. `history` lists the revisions and amendments but is not the token source.
 2. Reserve the amendment:
 
    ```bash
