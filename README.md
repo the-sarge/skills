@@ -13,6 +13,7 @@ plus any scripts, assets, or agent configs it needs.
   assets/           # optional templates the skill installs
   agents/           # optional per-agent configuration
 _shared/            # protocol documents several skills compose
+_releases/          # reviewed installation states that are not installed
 ```
 
 `_shared/` is not a skill. It holds protocol documents that skills reference as
@@ -49,6 +50,14 @@ Link `_shared` too. Skills that reference `../_shared/…` resolve it relative t
 their own location in the skills directory, so a missing `_shared` leaves those
 links broken with no error — the referencing skill simply proceeds without the
 protocol it was supposed to compose.
+
+## Releases
+
+`_releases/` holds reviewed installation states that ship beside, not in place of, the live skills. Nothing links them, so merging or pulling one leaves every installed skill unchanged. Each `_releases/<state>/<skill>/` directory is a complete, self-contained skill that keeps its live skill's name; installing one is an explicit link or copy change by whoever owns that transition.
+
+| State | Contents |
+| --- | --- |
+| `_releases/legacy-hold/append-dev-journal/` | journal-cutover hold: pauses Markdown and hosted journal writes, preserves each account's inputs, and reports journal-pending; its `scripts/dev_journal.py` stub refuses every cached legacy command |
 
 ## The RAS family
 
