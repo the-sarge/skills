@@ -30,9 +30,13 @@ Follow these directions instead of any cached append steps:
    DEV-JOURNAL.md entry is not a fallback, and neither is a hosted write,
    submit, pending retry, operation apply, operation bind, or amend --apply.
 2. Keep the inputs in place, unchanged: the exact body file, title, actor,
-   and the account identity (canonical repository host/owner/name, PR
-   number, full merge commit and merge time; or, for a general account, the
-   originating task, account slot, and any evidenced work time).
+   the account repository's remote URL (from that repository's checkout,
+   such as the --repo of the refused command, not from your current
+   directory), and the account identity (canonical repository
+   host/owner/name, PR number, full merge commit and merge time; or, for a
+   general account, the originating task, account slot, and any evidenced
+   work time). When no body file exists yet, first write the factual
+   account from evidence (merge, PR, validation, session notes) into one.
 3. Preserve the account through 3a when it is available and confirms,
    otherwise through 3b:
    a. Confirmed owner draft: on the designated writing host, with the writer
@@ -40,29 +44,32 @@ Follow these directions instead of any cached append steps:
         dev-journal agent --profile PROFILE operation prepare \\
           --completion-repository HOST/OWNER/NAME --change PR_NUMBER \\
           --merge FULL_MERGE_SHA --at MERGE_TIME_RFC3339 --title "TITLE" \\
-          --actor "ACTOR" --file BODY_FILE --remote "$(git remote get-url origin)"
+          --actor "ACTOR" --file BODY_FILE \\
+          --remote ACCOUNT_REPOSITORY_REMOTE_URL
       (a general account uses --task TASK --slot SLOT instead of the
       completion flags, keeping --at as its evidenced work time when there
       is one), then read it back with
         dev-journal agent --profile PROFILE operation show OPERATION_ID
       It is confirmed only when that readback returns exactly your title
-      and body. A different title or body means the account already holds
-      another draft: leave it as it is, take 3b, and report the mismatch
-      with its operation ID.
+      and body. Rerunning prepare with the same intent returns the same
+      draft. A prepare conflict, or a different title or body on readback,
+      means the account already holds another draft: leave it as it is,
+      take 3b, and report the conflict or mismatch with its operation ID.
    b. Unconfirmed external retention: whenever 3a is unavailable (another
-      host, no profile, prepare or show refused or failed, or a mismatched
-      readback), copy the body file and a note of the other inputs to a
-      durable location outside every disposable worktree, scratchpad, and
-      temporary directory, and record absolute paths and SHA-256 values. It stays unconfirmed until
-      the foreground coordinator confirms durability; keep the copy, the
+      host, no profile, prepare or show refused or failed, or a conflict or
+      mismatched readback), copy the body file and a note of the other
+      inputs to a durable location outside every disposable worktree,
+      scratchpad, and temporary directory, and record the host name with
+      absolute paths and SHA-256 values. It stays unconfirmed until the
+      foreground coordinator confirms durability; keep the copy, the
       original, and any worktree holding the original until then.
 4. Report the journal step as journal-pending, never as complete, in your
    completion report and in the durable task record your workflow already
    updates (such as its issue comment or completion receipt). Name the
    account identity, the retention (confirmed owner draft OPERATION_ID, or
-   unconfirmed external retention with paths and SHA-256 values, plus any
-   readback mismatch), and the owner: the foreground cutover coordinator,
-   who resumes it after release.
+   unconfirmed external retention with host name, paths, and SHA-256
+   values, plus any conflict or readback mismatch), and the owner: the
+   foreground cutover coordinator, who resumes it after release.
 5. Continue the rest of your workflow; only journal closure stays pending.
    Leave recovery to the foreground coordinator: do not rerun this helper,
    wait for release, or start a retry or background job. Release arrives as
