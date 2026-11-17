@@ -114,7 +114,7 @@ Accepted originals are immutable. Change what an entry says only through a delib
 
    ```bash
    dev-journal agent --profile PROFILE operation amend ENTRY_ID --kind KIND \
-     --revision REVISION_ID --reason "REASON" --file TEXT_FILE --task TASK --slot SLOT
+     --revision REVISION_TOKEN --reason "REASON" --file TEXT_FILE --task TASK --slot SLOT
    ```
 
    A correction may also replace `--title`, `--at`, or `--metadata`. Use `--reserve-handle` instead of `--slot` to have the owner reserve one.
