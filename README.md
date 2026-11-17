@@ -47,7 +47,7 @@ for d in ~/code/github.com/the-sarge/skills/*/; do
 done
 ```
 
-Link `_shared` too. Skills that reference `../_shared/…` resolve it relative to
+Link `_shared` too, and link `dev-journal` wherever `append-dev-journal` is linked: the wrapper refers to it as `../dev-journal/`. Skills that reference `../_shared/…` resolve it relative to
 their own location in the skills directory, so a missing `_shared` leaves those
 links broken with no error — the referencing skill simply proceeds without the
 protocol it was supposed to compose.

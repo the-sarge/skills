@@ -54,7 +54,7 @@ The journal date for a completion account is the merge time. A general account u
      --remote ACCOUNT_REPOSITORY_REMOTE_URL
    ```
 
-   A general account replaces the three completion flags with `--task TASK --slot SLOT` (or `--reserve-handle`), keeping `--at` for an evidenced work time. Rerunning prepare with the same intent returns the existing draft. Use `--additional` only when the owner deliberately wants a second account for the same task, never to get around an existing draft.
+   A general account replaces the three completion flags with `--task TASK` plus `--slot SLOT`, `--handle HANDLE` for a handle the owner already reserved, or `--reserve-handle` to have the owner reserve one, keeping `--at` for an evidenced work time. Rerunning prepare with the same intent returns the existing draft. Add `--additional` (only with `--reserve-handle`) only when the owner deliberately wants a second account for the same task, never to get around an existing draft.
 2. **Read back** the draft with `operation show OPERATION_ID`. Continue only when it shows exactly your title and body. A different title or body means the obligation already retains other intent; handle it under [Changed authored intent](#changed-authored-intent).
 3. **Apply** it with `operation apply OPERATION_ID`. Apply binds the attempt, dispatches it through the retained record, and verifies the accepted original. Success reports `Readback: verified hosted original of entry ENTRY_ID at revision N`.
 4. **Report** the entry ID, the operation ID, and that readback. That is journal completion.
@@ -65,7 +65,7 @@ If apply is refused because dispatch is held, or it ends in any state other than
 
 When prepare reports `conflict` because the obligation already retains different authored intent, the submission owner keeps both: the retained draft and your content as a held proposal. Do not prepare another account, and do not delete either version. Inspect both with `operation show OPERATION_ID`, then resolve explicitly, following the instruction the conflict printed:
 
-- If you own the account and the new content is a deliberate correction of an unbound draft, run `operation revise OPERATION_ID --expected-revision N` with the content to keep: the proposal to adopt it, or the current content to keep the draft as it is.
+- If you own the account and the new content is a deliberate correction of an unbound draft, run `operation revise OPERATION_ID --expected-revision N`, with `N` the revision `operation show` reported, passing the content to keep (`--title` and `--file`): the proposal's to adopt it, or the current content's to keep the draft as it is.
 - If an attempt is already bound or settled, use `operation resolve OPERATION_ID --expected-attempt N --proposal P --reason "REASON"` only after `operation show` reports that attempt authoritatively settled.
 - If you are not the account's owner, or the right content is unclear, leave both versions as they are and report the conflict, with its operation ID, to the owner as journal-pending.
 
@@ -75,7 +75,7 @@ When there is no writer profile on this host, or prepare or show is refused or f
 
 ## Pending accounts
 
-Every account that is not accepted with readback is journal-pending. Its owner is the foreground owner of the invoking workflow: the session or coordinator that will resume it. Name that owner explicitly. Record the pending account in the durable task record the workflow already keeps (its issue comment or completion receipt), with:
+Every account that is not accepted with readback is journal-pending. Its owner is the foreground owner of the invoking workflow: the session or coordinator that will resume it. Name that owner explicitly. When your own session will end first, as a dispatched worker's does, the owner is the coordinator or operator that dispatched you, never yourself; a coordinator that finds a pending account whose named owner is gone records itself as the owner before resuming it. Record the pending account in the durable task record the workflow already keeps (its issue comment or completion receipt), with:
 
 - the account identity (repository, PR number and merge commit, or task and slot);
 - the operation ID, its state, and its current request ID, or the unconfirmed external retention with host, paths, and SHA-256 values;
@@ -125,8 +125,8 @@ If the entry changed after you read it, the revision check fails. Read it again 
 ## Legacy journals and completed history
 
 - **Historical files.** A repository's `DEV-JOURNAL.md` is a historical record. Read it as history when the question is explicitly historical, for example a period or repository the hosted journal does not cover. Reading it never imports it, and an excluded history stays excluded.
-- **Non-entry text is history too.** Header append directions ("New entries go at the END of this file", "scroll to the bottom and append"), preamble status or trigger notes, and templates inside a legacy journal describe the earlier method or an earlier state. They are not live instructions. Do not follow them as write directions, and do not edit them to keep them current. When such a note mirrors a live fact, such as an implementation trigger, update the authoritative source it mirrors (an ADR status, `AGENTS.md`, `README.md`) and leave the journal bytes unchanged.
-- **Current instructions** come from the installed skills and each repository's governing sources. A repository's stronger journal rule governs over this skill.
+- **Non-entry text is history too.** Header append directions ("New entries go at the END of this file", "scroll to the bottom and append"), preamble status or trigger notes, and templates inside a legacy journal describe the earlier method or an earlier state. They are not live instructions. Do not follow them as write directions, and do not edit them to keep them current. When such a note mirrors a live fact, such as an implementation trigger, update the authoritative source it mirrors (an ADR status, `AGENTS.md`, `README.md`) and leave the journal bytes unchanged. If no other source holds that fact, leave the journal unchanged and report the gap.
+- **Current instructions** come from the installed skills and each repository's governing sources. A repository's stronger journal rule governs over this skill, but this skill cannot change it. When a repository's governing source still requires a Markdown journal write, a journal commit, or a journal PR, follow neither that rule nor a Markdown fallback: hold the account as journal-pending with its inputs kept, and report the conflict to the operator.
 - **Completed legacy closure stays complete.** A journal step completed under the earlier Markdown method before the hosted release, with its journal commit or journal PR merged, remains satisfied. Do not re-journal it, write a hosted duplicate, or demand a hosted receipt for it. Hosted completion applies to accounts owed after release.
 
 ## Completion
