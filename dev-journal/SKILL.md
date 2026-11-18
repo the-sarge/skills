@@ -7,19 +7,19 @@ description: Write, find, read, and amend hosted development-journal entries thr
 
 This skill owns the agent procedure for the hosted journal: writing accounts, finding and completely reading entries, deliberate amendments, and reporting pending work. It holds no state of its own. The `dev-journal` CLI and its submission owner own durable drafts, operation lookup, immutable requests, receipts, and recovery; hosted receipts are the acceptance authority. Callers decide when an account is owed and then follow this skill; they do not restate its rules.
 
-A journal step is **complete** only when the account has an accepted hosted receipt and its original has been read back. A Markdown append, a journal commit, or a journal PR is not completion. Anything short of acceptance and readback is **journal-pending**.
+A journal step is **complete** when the relevant hosted receipt and its readback establish where the authored account was recorded. Until then it is **journal-pending**.
 
 ## Entry point and profile
 
-Run every journal command through the supported entry point, naming the command first:
+Route journal operations through the supported entry point and put command names before their flags.
 
 ```bash
 dev-journal agent --profile PROFILE COMMAND [ARGS]
 ```
 
-`PROFILE` is the absolute path of this host's installation profile, supplied by the operator or recorded by the installation. Never guess it, and never pass `--config`, `--state-dir`, or `--host-identity`; the profile fixes them. A **writer** profile exists only on the designated writing host and can prepare and dispatch. A **reader** profile can only read. With no profile, do not write by any other route: keep the account's inputs as described under [No writer profile](#no-writer-profile).
+`PROFILE` is the absolute path of this host's installed profile, supplied by the operator or recorded by the installation. To inspect the installed role and validate its proof, run `dev-journal profile show --profile PROFILE`. The `agent` entry point revalidates it on each call. A **writer** profile can prepare and apply in its own protected local store. A **reader** profile allows reads. Use the installed binary and profile as supplied. Keep `--config` and `--state-dir` out of routed commands.
 
-The entry point checks the profile's dispatch status before any mutation. A refusal such as `journal dispatch is held in phase PHASE` means dispatch is paused: keep the prepared draft, report journal-pending, and do not retry or wait. Reading and local preparation stay available while dispatch is held.
+If the installation is missing, read-only or invalid, follow [No writer profile](#no-writer-profile). If routing or the service refuses a retained write, preserve the local selector and report it [pending](#pending-accounts). Leave profile setup, migration, recovery and fence changes to the operator. Continue to honor any hold already loaded in the session and leave identified pre-upgrade random-ID obligations with their recorded owners. [Operator upgrade and rollback runbook](https://github.com/the-sarge/dev-journal/blob/main/docs/operations/writer-profile-upgrade.md)
 
 Never use these routes, even when they would work: hand-editing, appending to, committing, or opening a PR for any `DEV-JOURNAL.md`; raw `write`; raw `amend --apply`; `pending retry` outside the operation that owns the request; or any helper script. The entry point refuses most of them, and this skill forbids all of them.
 
@@ -31,62 +31,81 @@ Resolve the account's repository from that repository's own checkout, not from w
 dev-journal agent --profile PROFILE repository resolve --remote ACCOUNT_REPOSITORY_REMOTE_URL
 ```
 
-When it resolves, use the registered repository ID it reports. When the repository is not registered, do not guess an ID and do not fall back to a Markdown journal. Prepare the account with `--remote ACCOUNT_REPOSITORY_REMOTE_URL` so the draft keeps its authored intent until registration is resolved, report journal-pending, and tell the operator the repository needs registration or deliberate selection. Having no registered identity never authorizes importing that repository's historical journal.
+When it resolves, use the matching HTTPS locator from `Aliases` for `--completion-repository`. Select the destination with the checkout `--remote` shown below or the verified `--repo REPOSITORY_ID`.
+
+When the repository is unregistered or lookup is unavailable, a writer can still prepare offline with the checkout `--remote`. For a completion, supply the merged repository's full, case-preserving HTTPS locator from the forge as `--completion-repository`. Keep the draft and report its selector and resume owner as journal-pending. The matching locator must be a registered alias of the chosen destination before it can bind. Ask the operator to resolve registration or selection. Historical import is a separate operator action.
 
 ## Write an account
 
 ### Gather the facts first
 
-For a **completion account** (product work), first establish the actual merge on the default branch: canonical repository `host/owner/name`, PR number, full merge commit, and merge time from the forge. Never draft or reserve a completion account before the merge exists. For a **general account** (session, handoff, decision batch), use the originating task identity and an account slot, or ask the owner to reserve a handle.
+For a **completion account**, establish the actual merge on the default branch before drafting or reserving the account. Use the repository locator from [Repository identity](#repository-identity), PR number, full merge commit, and exact forge merge timestamp. For a **general account**, use the originating issue or session and an explicit account slot or owner-reserved handle. A standalone freeform note can use a handle by itself. Two hosts naming the same task and slot owe the same account. Reuse the known identity when resuming and reserve a fresh handle only for a distinct account.
 
 Write the body from evidence: the merge, PR and issue state, validation output, and session notes. Keep each issue and PR reference with its number, link canonical decision records and live trackers rather than restating them, and record only facts the evidence supports. When the user supplies the body, keep it intact. `--actor` is narrative attribution and stays distinct from the authenticated identity. Write the body to a file and keep that file unchanged until the account is accepted.
 
-The journal date for a completion account is the merge time. A general account uses the evidenced work time when there is one, otherwise its date is frozen at the first prepare. Pass dates as RFC 3339 with seconds and an explicit offset. A held draft keeps its date across midnight and delayed acceptance.
+Supply `--at` as RFC 3339 with seconds and an explicit offset. For a completion account, use the forge merge timestamp verbatim. For a new general account, use the evidenced work time when available. For a shared task account, use the same explicit timestamp across hosts or carry over the exact date frozen at its first prepare. Each store otherwise supplies its own date for a task account. Preserve exact spelling, including `Z` or `+00:00`. If a standalone note was prepared without a date, keep `--at` omitted when reproducing it. The service supplies that note's date on acceptance.
 
 ### Prepare, read back, apply
 
-1. **Prepare** the draft. For a completion account:
+1. **Prepare** the draft offline. For a completion account, use the full repository HTTPS locator for the identity and the checkout remote for the destination lookup.
 
    ```bash
    dev-journal agent --profile PROFILE operation prepare \
-     --completion-repository HOST/OWNER/NAME --change PR_NUMBER --merge FULL_MERGE_SHA \
+     --completion-repository REPOSITORY_HTTPS_LOCATOR --change PR_NUMBER --merge FULL_MERGE_SHA \
      --at MERGE_TIME_RFC3339 --title "TITLE" --actor "ACTOR" --file BODY_FILE \
      --remote ACCOUNT_REPOSITORY_REMOTE_URL
    ```
 
-   A general account replaces the three completion flags with `--task TASK` plus `--slot SLOT`, `--handle HANDLE` for a handle the owner already reserved, or `--reserve-handle` to have the owner reserve one, keeping `--at` for an evidenced work time. Rerunning prepare with the same intent returns the existing draft. Add `--additional` (only with `--reserve-handle`) only when the owner deliberately wants a second account for the same task, never to get around an existing draft.
-2. **Read back** the draft with `operation show OPERATION_ID`. Continue only when it shows exactly your title and body. A different title or body means the obligation already retains other intent; handle it under [Changed authored intent](#changed-authored-intent).
-3. **Apply** it with `operation apply OPERATION_ID`. Apply binds the attempt, dispatches it through the retained record, and verifies the accepted original. Success reports `Readback: verified hosted original of entry ENTRY_ID at revision N`.
-4. **Report** the entry ID, the operation ID, and that readback. That is journal completion.
+   For a general account, use `--task TASK --slot SLOT` in place of the three completion flags and follow the date guidance above. To use a handle, replace `--slot SLOT` with the existing `--handle HANDLE` or reserve one with `--reserve-handle`. Use `--additional` with `--reserve-handle` only for a deliberately separate account for the same task. Use `--reuse-handle` with `--handle` only for a known general account from another store when there is no retained attempt to resume there. For a new standalone freeform note, omit `--task` and use `--reserve-handle`.
 
-If apply is refused because dispatch is held, or it ends in any state other than accepted with readback, the account is journal-pending: follow [Pending accounts](#pending-accounts).
+2. **Read back** the exact selector from prepare with `operation show OPERATION_ID` and compare the identity, destination and authored fields, including the exact body. A completion prepare with the same intent rediscovers its selector. Different completion wording can return a separate contribution selector. Use `operation list` to recover selectors when needed. If prepare reports a held proposal, see [Changed authored intent](#changed-authored-intent).
+3. **Apply** the selector in the same installation and include `--json` for verification. Use `operation apply OPERATION_ID` for a general account. For a completion, follow the shown `Apply:` command under `agent --profile PROFILE`. Apply a child contribution by its own ID or select it with `operation apply ROOT_OPERATION_ID --contribution CONTRIBUTION_ID`. Use the root ID as both arguments to select the root's own contribution explicitly. Apply can settle an outstanding prerequisite original for the selected child. It leaves any other contributions for explicit selection.
+4. **Verify and report** the relevant [receipt and readback](#receipt-and-readback), then [report journal success to the user](#report-to-the-user). An unverified result follows [Pending accounts](#pending-accounts).
+
+### Receipt and readback
+
+In the apply JSON, use `operation.association.receipt` if an association is present. Otherwise use the accepted `submission.receipt`. For an original, match that receipt to `readback.receipt` and check `readback.original` against the retained intent or the original verified for association. For an amendment, find the matching receipt in `readback.amendments` and compare that record's request to the selected authored content. Decode `body_base64` to compare body bytes. For a no-op amendment, require the matching accepted receipt with `noop` set and the CLI's verified account readback. A no-op may have no amendment record.
+
+A matching completion can recover the receipt of the original or of an already recorded complete comment. Different content for the same merge can be accepted automatically as a complete comment, preserving its own body and authored fields beside the earlier original. A later explicit correction leaves the introducing comment's receipt intact. Different content for a shared general identity needs deliberate disposition by the account owner.
+
+### Report to the user
+
+After confirmed acceptance and readback, give the user a descriptive Markdown link to the actual hosted entry in the final session report. Use the operator's documented mapping for the installed deployment, service and workspace. An isolated recovery deployment can retain the same service and workspace IDs. For the documented personal deployment, including its legacy API endpoint, use `[Read the journal entry](https://app.dev-journal.com/journal/entries/ENTRY_ID)` with `ENTRY_ID` replaced by the URL-escaped entry ID from the verified receipt. For another deployment, use its documented browser origin and entry route. An amendment links to its containing entry, and an association links to the selected existing entry. A browser sign-in may be required. [Hosted reader route](https://github.com/the-sarge/dev-journal/blob/main/docs/design/private-reader.md) · [Personal journal origin](https://github.com/the-sarge/dev-journal/blob/main/docs/operations/render.md#application-domain-and-client-configuration)
+
+If the reader origin or route cannot be established, report the verified entry ID and say the reader link is unavailable. Keep the selected operation ID and the accepted receipt's request ID, entry ID and revision in the durable record. Read the revision from the selected receipt. The entry may have moved to a newer revision. Reserve identifiers in the chat for recovery or when the user asks for them. For pending work, use the [pending report](#pending-accounts) with its recovery reference.
+
+### Associate an existing account
+
+Read the entry and its history and inspect the retained draft. Check that the immutable original is in the same repository and compare title, exact body, attribution, date presence and spelling, historical status, metadata and ordered links. If the fields differ, associate only when the owner has verified and recorded that the original still fulfills this obligation. Leave an unresolved difference with the retained selector for ordinary apply or owner disposition. For a verified original that fulfills the obligation, use `operation associate OPERATION_ID --entry ENTRY_ID` only on an eligible draft or an attempt proved never dispatched. Apply the inspected selector with `--json` for verified readback. An uncertain attempt stays on its exact recovery path.
+
+For a matching complete comment on an earlier original, rediscover the exact completion contribution with `operation list` or prepare the same authored intent if its selector is absent. Apply that selection and verify the introducing comment's receipt. For an original captured by a bound import, the operator can use the import association route with that bundle's evidence. After readback, [report journal success to the user](#report-to-the-user).
 
 ### Changed authored intent
 
-When prepare reports `conflict` because the obligation already retains different authored intent, the submission owner keeps both: the retained draft and your content as a held proposal. Do not prepare another account, and do not delete either version. Inspect both with `operation show OPERATION_ID --json`: `revision` is the draft's current revision, `intent` is the retained draft, and `held_proposals` lists each proposal's `intent` in order (bodies are base64 in `body_base64`). Then resolve explicitly, following the instruction the conflict printed:
+When prepare reports `conflict` and `operation show OPERATION_ID --json` confirms a held proposal, preserve both versions. `revision` identifies the current draft, `intent` holds its authored fields, and `held_proposals` lists each proposed `intent` in order (bodies are base64 in `body_base64`). Follow the printed resolution guidance for that operation.
 
-- If you own the account and the new content is a deliberate correction of an unbound draft, run `operation revise OPERATION_ID --expected-revision N` with `N` that revision. Revise replaces the whole intent, so pass every field of the version you keep, taken from its JSON: exactly one repository selection (`--repo REPOSITORY_ID` or each `--remote`), `--title`, the decoded body as `--file`, `--actor` for its attribution, `--metadata` with its metadata as a JSON file, and each `--link`. An omitted field other than the journal date is dropped. Keep the proposal's fields to adopt it, or reproduce the current intent exactly to keep the draft; an exact reproduction disposes the proposals without a new revision.
-- If an attempt is already bound or settled, use `operation resolve OPERATION_ID --expected-attempt N --proposal P --reason "REASON"` only after `operation show` reports that attempt authoritatively settled. `N` is the number of attempts shown, and `P` is the proposal's 1-based position in `held_proposals`, or 0 to rebind the current intent.
+- To deliberately resolve your unbound account draft, run `operation revise OPERATION_ID --expected-revision N` with the inspected revision. Reproduce the selected intent's repository selection, title, decoded body file, attribution, journal date, historical flag, metadata and links. For a historical freeform note, pass both `--at` and `--historical` again. Use `operation revise-amendment` for an unbound amendment with the complete selected amendment intent. An exact reproduction of the current intent keeps it and disposes the proposals without opening a new revision.
+- If an attempt is bound, use `operation resolve OPERATION_ID --expected-attempt N --proposal P --reason "REASON"` only when it is authoritatively settled as never dispatched. `N` is the current attempt sequence, and `P` is the proposal's 1-based position in `held_proposals`, or 0 to rebind the current intent.
 - If you are not the account's owner, or the right content is unclear, leave both versions as they are and report the conflict, with its operation ID, to the owner as journal-pending.
 
 ### No writer profile
 
-When there is no writer profile on this host, or prepare or show is refused or fails, preserve the account outside the submission owner instead. Copy the body file and a note of the other inputs (title, actor, remote, and the completion or general identity) to a durable location outside every disposable worktree, scratchpad, and temporary directory, and record the host name, absolute paths, and SHA-256 values. This retention stays **unconfirmed** until the account's owner confirms its durability; until then keep the copy, the original, and any worktree holding the original.
+If the installed writer is unavailable or prepare or show fails before retention can be confirmed, copy the exact body and all other inputs to a durable location outside every disposable worktree, scratchpad and temporary directory. Keep the chosen identity, repository, title, date with its original spelling or omission, historical flag, actor, metadata and links, plus the amendment entry, kind, target, revision token, reason and patch when applicable. Record the host name, absolute paths and SHA-256 values. Preserve any known selector or request too. External retention stays **unconfirmed** until the account's owner verifies its durability. Until then keep the copy, original and any worktree holding the original. [Report journal-pending](#pending-accounts) with the named resume owner.
 
 ## Pending accounts
 
 Every account that is not accepted with readback is journal-pending. Its owner is the foreground owner of the invoking workflow: the session or coordinator that will resume it. Name that owner explicitly. When your own session will end first, as a dispatched worker's does, the owner is the coordinator or operator that dispatched you, never yourself; a coordinator that finds a pending account whose named owner is gone records itself as the owner before resuming it. Record the pending account in the durable task record the workflow already keeps (its issue comment or completion receipt), with:
 
-- the account identity (repository, PR number and merge commit, or task and slot);
-- the operation ID, its state, and its current request ID, or the unconfirmed external retention with host, paths, and SHA-256 values;
+- the account identity (repository, PR number and merge commit, or originating task and slot or reserved handle, plus the entry and subject for an amendment);
+- the originating installation and operation ID or contribution selector, its state, and its current request ID if bound, or the external retention with host, paths, SHA-256 values and confirmation state;
 - the named resume owner and where the resume reference is recorded.
 
-Resume only that operation, and only as its owner:
+The named owner resumes the retained selection in its original installation. If only authored inputs were retained, first check for an existing selector or accepted receipt before preparing from those inputs on an available writer. When a verified account or complete comment already satisfies the obligation, follow [Associate an existing account](#associate-an-existing-account). Leave store copies with operator recovery.
 
-- `operation show OPERATION_ID` (and `pending show REQUEST_ID`) report its state: `unbound_draft`, `pending`, `outcome_unknown`, `reconciliation_required`, or `accepted`.
-- `pending` or `outcome_unknown`: resume with `operation apply OPERATION_ID`, or `operation apply OPERATION_ID --request REQUEST_ID` to retry exactly that retained request. A timeout or a missing receipt is not permission to create a new request or a new account.
-- `reconciliation_required`, a recovery-generation conflict, or a payload conflict: stop. Keep all evidence and report it to the operator for disposition.
-- An obligation whose account was already accepted elsewhere, such as one captured by a history import, is closed by `operation associate`, not by a second account. That is the cutover coordinator's action.
+- Inspect with `operation show OPERATION_ID`. If a bound attempt is still initializing (`ready: false`), resume with its inspected apply selector so the CLI can materialize the same stored envelope. Once ready, use `pending show --json -- REQUEST_ID` to inspect the request. If the record of an already-ready request is missing, retain the evidence for operator reconciliation.
+- For a draft or interrupted selection without a bound request, resume using its inspected apply selector. For `pending` or `outcome_unknown` with a current bound request, use `operation apply OPERATION_ID --request REQUEST_ID` with the selected operation's own ID and the retained request ID. Omit `--contribution` on an exact retry. If the CLI confirms a settled completion collision or stale complete-comment attempt and instructs you to continue the same contribution, follow that inspected apply selector without `--request`. Keep an ambiguous request with its existing operation for exact retry.
+- For a settled collision with different content for the same general account, keep the operation and collision evidence. Report journal-pending to the named account owner with the retained operation and competing entry IDs, even if `pending list` is empty. Leave any new slot, handle or deliberate amendment to that owner's decision.
+- For an accepted selection with readback still due, apply that selection again to retrieve its verified receipt and readback. For `reconciliation_required`, a recovery-generation conflict or a conflicting payload, preserve the evidence and refer it to the operator for disposition.
 
 Do not drain other pending accounts, start a background retry or wait loop, or fall back to Markdown. Before cleaning up a worktree, confirm every input, operation pointer, and recovery artifact the account needs is durable and discoverable elsewhere. An empty retention field is not proof.
 
@@ -109,18 +128,18 @@ Results are paged. A complete answer requires following each page's `Next cursor
 
 Accepted originals are immutable. Change what an entry says only through a deliberate amendment, and only when you have a reason to: a `correction` of the original, an `addendum`, or a `comment`. Never write a new account to replace an old one.
 
-1. Run `read ENTRY_ID` and take its `Revision token:` (`revision_token` with `--json`), an opaque token. `history` lists the revisions and amendments but is not the token source.
-2. Reserve the amendment:
+1. Run `read ENTRY_ID`, inspect the subject and take the opaque `Revision token:` (`revision_token` with `--json`). Use `history` when you need the revision index or the introducing revision of an attached subject.
+2. Reserve the amendment. For a correction to an attached subject, add `--target-revision N` with its introducing revision.
 
    ```bash
    dev-journal agent --profile PROFILE operation amend ENTRY_ID --kind KIND \
      --revision REVISION_TOKEN --reason "REASON" --file TEXT_FILE --task TASK --slot SLOT
    ```
 
-   A correction may also replace `--title`, `--at`, or `--metadata`. Use `--reserve-handle` instead of `--slot` to have the owner reserve one.
-3. Check it with `operation preview OPERATION_ID`, then apply it with `operation apply OPERATION_ID` and read the entry back.
+   An original correction can also replace the title, date or entry metadata. For an attached subject, change its text or pass a links-only `--metadata` patch for `journal_links`. For a links-only correction, omit `--file` and `--text` to preserve the current body. Use `--reserve-handle` instead of `--slot` to have the owner reserve one.
+3. Check the retained intent and preview it with `operation preview OPERATION_ID`, then apply it with `operation apply OPERATION_ID --json`, verify its [receipt and readback](#receipt-and-readback), and [report journal success to the user](#report-to-the-user).
 
-If the entry changed after you read it, the revision check fails. Read it again and decide afresh; do not force the amendment. A changed amendment draft is resolved with `operation revise-amendment` at the expected revision, as in [Changed authored intent](#changed-authored-intent).
+If the revision check fails, reread the entry. Use `operation revise-amendment` at the expected draft revision to resolve changed intent while still unbound. If the CLI confirms a dispatched correction was rejected for a stale token, retain that exact attempt. Only if the owner still wants to make the change after inspecting the new revision, reserve a distinct amendment with the fresh token and a new slot or handle. Use `--reserve-handle --additional` when another handle already exists for that task, entry and subject. Follow exact-request recovery for an ambiguous dispatch.
 
 ## Legacy journals and completed history
 

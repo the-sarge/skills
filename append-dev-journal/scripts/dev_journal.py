@@ -35,19 +35,12 @@ Do this instead of any cached append steps:
 1. Do not append to, create, commit, or open a PR for any DEV-JOURNAL.md.
    Markdown journals are historical reading sources only, and a manual
    append is not a fallback.
-2. Keep the inputs in place, unchanged: the body file, title, actor, and the
-   account repository's remote URL (from that repository's checkout, such
-   as the --repo of the refused command, not from your current directory).
+2. Keep the account identity and inputs in place, unchanged: the body file,
+   title, actor, and the account repository's remote URL from its own checkout.
 3. Read the canonical dev-journal skill and follow it for this account:
      {skill}
-   It writes the account through
-     dev-journal agent --profile PROFILE operation prepare ...
-     dev-journal agent --profile PROFILE operation show OPERATION_ID
-     dev-journal agent --profile PROFILE operation apply OPERATION_ID
-   and completes only with an accepted hosted receipt and readback.
-4. If the account cannot be accepted now, report it as journal-pending with
-   its identity, its operation ID or retained-input location, and the named
-   owner who will resume it. Do not rerun this helper.
+   Follow its installed-profile, selection, and receipt instructions.
+4. For journal-pending, use that skill's retention and reporting procedure.
 """
 
 
