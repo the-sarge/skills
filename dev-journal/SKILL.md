@@ -43,7 +43,7 @@ For a **completion account**, establish the actual merge on the default branch b
 
 Write the body from evidence: the merge, PR and issue state, validation output, and session notes. Keep each issue and PR reference with its number, link canonical decision records and live trackers rather than restating them, and record only facts the evidence supports. When the user supplies the body, keep it intact. `--actor` is narrative attribution and stays distinct from the authenticated identity. Write the body to a file and keep that file unchanged until the account is accepted.
 
-Supply `--at` as RFC 3339 with seconds and an explicit offset. For a completion account, use the forge merge timestamp verbatim. For a shared general account, use the same explicit work timestamp across hosts or carry over the exact date frozen at its first prepare. Each store otherwise supplies its own date for a task account. Preserve exact spelling, including `Z` or `+00:00`. If a standalone note was prepared without a date, keep `--at` omitted when reproducing it. The service supplies that note's date on acceptance.
+Supply `--at` as RFC 3339 with seconds and an explicit offset. For a completion account, use the forge merge timestamp verbatim. For a new general account, use the evidenced work time when available. For a shared task account, use the same explicit timestamp across hosts or carry over the exact date frozen at its first prepare. Each store otherwise supplies its own date for a task account. Preserve exact spelling, including `Z` or `+00:00`. If a standalone note was prepared without a date, keep `--at` omitted when reproducing it. The service supplies that note's date on acceptance.
 
 ### Prepare, read back, apply
 
@@ -137,7 +137,7 @@ Accepted originals are immutable. Change what an entry says only through a delib
    An original correction can also replace the title, date or entry metadata. For an attached subject, use text and, when needed, a links-only metadata patch. Use `--reserve-handle` instead of `--slot` to have the owner reserve one.
 3. Check the retained intent and preview it with `operation preview OPERATION_ID`, then apply it with `operation apply OPERATION_ID --json`, verify its [receipt and readback](#receipt-and-readback), and [report journal success to the user](#report-to-the-user).
 
-If the revision check fails, reread the entry. Use `operation revise-amendment` at the expected draft revision to resolve changed intent while still unbound. If the CLI confirms a dispatched correction was rejected for a stale token, retain that exact attempt. Only if the owner still wants to make the change after inspecting the new revision, reserve a distinct amendment under a new slot or handle with the fresh token. Follow exact-request recovery for an ambiguous dispatch.
+If the revision check fails, reread the entry. Use `operation revise-amendment` at the expected draft revision to resolve changed intent while still unbound. If the CLI confirms a dispatched correction was rejected for a stale token, retain that exact attempt. Only if the owner still wants to make the change after inspecting the new revision, reserve a distinct amendment with the fresh token and a new slot or handle. Use `--reserve-handle --additional` when another handle already exists for that task, entry and subject. Follow exact-request recovery for an ambiguous dispatch.
 
 ## Legacy journals and completed history
 
